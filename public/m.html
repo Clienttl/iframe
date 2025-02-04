@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Cursor Chase</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; overflow: hidden; }
+        body { background: black; color: white; font-family: Arial, sans-serif; text-align: center; }
+        .dot { position: absolute; width: 15px; height: 15px; background: red; border-radius: 50%; }
+        .game-over { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
+    </style>
+</head>
+<body>
+    <div id="usernameInput">
+        <h2>Enter your username:</h2>
+        <input type="text" id="username" />
+        <button onclick="setUsername()">Join</button>
+    </div>
+    <div class="game-over" id="gameOver">
+        <h1>Game Over</h1>
+        <p id="winner"></p>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket = io();
+        let username = localStorage.getItem("username");
+        let isSpectator = false;
+        let gameStarted = false;
+
+        function setUsername() {
+            username = document.getElementById("username").value;
+            if (username) {
+                localStorage.setItem("username", username);
+                socket.emit("setUsername", username);
+                document.getElementById("usernameInput").style.display = "none";
+            }
+        }
+
+        socket.on("usernameTaken", () => {
+            alert("Username already taken. Choose another.");
+        });
+
+        socket.on("startGame", () => {
+            gameStarted = true;
+            initGame();
+        });
+
+        socket.on("spectate", () => {
+            isSpectator = true;
+        });
+
+        socket.on("gameOver", (winner) => {
+            document.getElementById("gameOver").style.display = "block";
+            document.getElementById("winner").innerText = `${winner} won!`;
+            setTimeout(() => location.reload(), 5000);
+        });
+
+        function initGame() {
+            let cursorX = window.innerWidth / 2, cursorY = window.innerHeight / 2;
+            let dots = [];
+            let speed = 2;
+            let speedIncreaseRate = 0.05;
+            
+            function createDot() {
+                let dot = document.createElement("div");
+                dot.classList.add("dot");
+                dot.style.left = `${Math.random() * window.innerWidth}px`;
+                dot.style.top = `${Math.random() * window.innerHeight}px`;
+                document.body.appendChild(dot);
+                dots.push({ element: dot, x: parseFloat(dot.style.left), y: parseFloat(dot.style.top) });
+            }
+            
+            document.addEventListener("mousemove", (e) => {
+                if (!isSpectator) {
+                    cursorX = e.clientX;
+                    cursorY = e.clientY;
+                }
+            });
+            
+            function update() {
+                dots.forEach(dot => {
+                    let angle = Math.atan2(cursorY - dot.y, cursorX - dot.x);
+                    dot.x += Math.cos(angle) * speed;
+                    dot.y += Math.sin(angle) * speed;
+                    dot.element.style.left = `${dot.x}px`;
+                    dot.element.style.top = `${dot.y}px`;
+                    
+                    if (!isSpectator && Math.hypot(cursorX - dot.x, cursorY - dot.y) < 10) {
+                        socket.emit("playerDied");
+                        isSpectator = true;
+                    }
+                });
+                speed += speedIncreaseRate;
+                requestAnimationFrame(update);
+            }
+            
+            setInterval(createDot, 3000);
+            update();
+        }
+    </script>
+</body>
+</html>
