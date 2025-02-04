@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>about:blank</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; overflow: hidden; }
+        body { background: black; color: white; font-family: Arial, sans-serif; text-align: center; }
+        .dot { position: absolute; width: 50px; height: 50px; background: red; border-radius: 50%; }
+        .game-over { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
+    </style>
+</head>
+<body>
+    <div class="game-over" id="gameOver">
+        <h1>Game Over</h1>
+        <p id="score"></p>
+        <button onclick="location.reload()">Try Again</button>
+    </div>
+    <script>
+        let cursorX = window.innerWidth / 2, cursorY = window.innerHeight / 2;
+        let dots = [];
+        let startTime = Date.now();
+        let speed = 2;
+        let spawnRate = 5000;
+        let speedIncreaseRate = 0.0001;
+
+        function createDot() {
+            let dot = document.createElement("div");
+            dot.classList.add("dot");
+            dot.style.left = `${Math.random() * window.innerWidth}px`;
+            dot.style.top = `${Math.random() * window.innerHeight}px`;
+            document.body.appendChild(dot);
+            dots.push({ element: dot, x: parseFloat(dot.style.left), y: parseFloat(dot.style.top), vx: 0, vy: 0 });
+        }
+
+        document.addEventListener("mousemove", (e) => {
+            cursorX = e.clientX;
+            cursorY = e.clientY;
+        });
+
+        function update() {
+            dots.forEach(dot => {
+                let angle = Math.atan2(cursorY - dot.y, cursorX - dot.x);
+                dot.vx = Math.cos(angle) * speed;
+                dot.vy = Math.sin(angle) * speed;
+
+                dots.forEach(otherDot => {
+                    if (dot !== otherDot) {
+                        let dx = dot.x - otherDot.x;
+                        let dy = dot.y - otherDot.y;
+                        let distance = Math.hypot(dx, dy);
+                        if (distance < 20) {
+                            dot.vx += dx * 0.02;
+                            dot.vy += dy * 0.02;
+                        }
+                    }
+                });
+
+                dot.x += dot.vx;
+                dot.y += dot.vy;
+                dot.element.style.left = `${dot.x}px`;
+                dot.element.style.top = `${dot.y}px`;
+
+                if (Math.hypot(cursorX - dot.x, cursorY - dot.y) < 10) {
+                    document.getElementById("gameOver").style.display = "block";
+                    document.getElementById("score").innerText = `You survived ${(Date.now() - startTime) / 1000} seconds!`;
+                    return;
+                }
+            });
+            speed += speedIncreaseRate;
+            requestAnimationFrame(update);
+        }
+
+        function spawnDots() {
+            createDot();
+            setTimeout(spawnDots, spawnRate);
+            if (spawnRate > 1000) spawnRate *= 0.9;
+        }
+
+        createDot();
+        setTimeout(spawnDots, spawnRate);
+        update();
+    </script>
+</body>
+</html>
