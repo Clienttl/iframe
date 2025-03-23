@@ -1,64 +1,67 @@
-const express = require("express");
-const multer = require("multer");
-const crypto = require("crypto");
-const path = require("path");
-
+// server.js
+const express = require('express');
+const mongoose = require('mongoose');
+const ShortUrl = require('./models/shortUrl');
 const app = express();
-const port = process.env.PORT || 3000;
 
-// Set up Multer to handle video uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/"); // Store videos in the 'uploads' folder
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname); // Keep original file name
-  },
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(() => console.log('Connected to MongoDB')).catch(err => console.error('MongoDB connection error:', err));
+
+app.set('view engine', 'ejs');
+app.use(express.urlencoded({ extended: false }));
+
+app.get('/', async (req, res) => {
+  const shortUrls = await ShortUrl.find();
+  res.render('index', { shortUrls });
 });
 
-const upload = multer({ storage: storage });
-
-// Serve static files from 'uploads' folder
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// Simple route to serve the homepage
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+app.post('/shorten', async (req, res) => {
+  await ShortUrl.create({ full: req.body.fullUrl });
+  res.redirect('/');
 });
 
-// Route to handle video upload
-app.post("/upload", upload.single("video"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).send("No video file uploaded.");
-  }
+app.get('/:shortUrl', async (req, res) => {
+  const shortUrl = await ShortUrl.findOne({ short: req.params.shortUrl });
+  if (!shortUrl) return res.sendStatus(404);
 
-  // Generate a random string (e.g., for shortening)
-  const randomString = crypto.randomBytes(3).toString("hex");
-
-  // Generate a shortened URL
-  const shortenedLink = `${req.protocol}://${req.get("host")}/?=${randomString}`;
-
-  // In a real app, save the video path and corresponding random string to a database.
-  // For simplicity, we'll use an in-memory object for mapping
-  global.videos = global.videos || {};
-  global.videos[randomString] = req.file.path;
-
-  // Return the shortened URL to the user
-  res.json({ shortenedLink });
+  res.redirect(shortUrl.full);
 });
 
-// Route for redirecting to the uploaded video
-app.get("/?:id", (req, res) => {
-  const videoId = req.query.id;
-  const videoPath = global.videos[videoId];
+app.listen(3000, () => console.log('Server running on http://localhost:3000'));
 
-  if (videoPath) {
-    res.redirect(`/uploads/${path.basename(videoPath)}`);
-  } else {
-    res.status(404).send("Video not found.");
-  }
+
+// models/shortUrl.js
+const mongoose = require('mongoose');
+const shortId = require('shortid');
+
+const shortUrlSchema = new mongoose.Schema({
+  full: { type: String, required: true },
+  short: { type: String, required: true, default: shortId.generate }
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});
+module.exports = mongoose.model('ShortUrl', shortUrlSchema);
+
+
+// views/index.ejs
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Link Shortener</title>
+</head>
+<body>
+  <h1>URL Shortener</h1>
+  <form action="/shorten" method="POST">
+    <input type="url" name="fullUrl" placeholder="Enter URL" required>
+    <button type="submit">Shorten</button>
+  </form>
+  <ul>
+    <% shortUrls.forEach(url => { %>
+      <li>
+        <a href="/<%= url.short %>">/<%= url.short %></a> - <a href="<%= url.full %>"><%= url.full %></a>
+      </li>
+    <% }) %>
+  </ul>
+</body>
+</html>
