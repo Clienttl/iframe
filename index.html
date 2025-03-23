@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Upload and Shortening Service</title>
+</head>
+<body>
+  <h1>Upload Your Video</h1>
+  <form id="uploadForm" enctype="multipart/form-data">
+    <input type="file" name="video" accept="video/*" required />
+    <button type="submit">Upload Video</button>
+  </form>
+
+  <div id="shortenedLink" style="display: none;">
+    <h2>Your Shortened Video Link:</h2>
+    <a id="shortenedUrl" href="" target="_blank">Click here</a>
+  </div>
+
+  <script>
+    const form = document.getElementById('uploadForm');
+    const shortenedLinkDiv = document.getElementById('shortenedLink');
+    const shortenedUrl = document.getElementById('shortenedUrl');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(form);
+
+      const response = await fetch('/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        shortenedUrl.href = data.shortenedLink;
+        shortenedUrl.textContent = data.shortenedLink;
+        shortenedLinkDiv.style.display = 'block';
+      } else {
+        alert('Error uploading video');
+      }
+    });
+  </script>
+</body>
+</html>
