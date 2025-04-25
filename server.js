@@ -1,39 +1,53 @@
 // server.js
 const WebSocket = require('ws');
 const http = require('http');
+const express = require('express'); // <-- Import Express
+const path = require('path');       // <-- Import Path module
 
 // --- Server Setup ---
-const server = http.createServer(); // Basic HTTP server
-const wss = new WebSocket.Server({ server }); // WebSocket server attached to HTTP server
-const PORT = process.env.PORT || 3000; // Use environment port or 3000
+const app = express();              // <-- Create an Express app
+const server = http.createServer(app); // <-- Create HTTP server FROM Express app
+const wss = new WebSocket.Server({ server }); // <-- Attach WebSocket server to it
+const PORT = process.env.PORT || 3000;
 
 console.log(`WebSocket server starting on port ${PORT}...`);
 
+// --- Serve the HTML file ---
+// When someone accesses the root URL ('/'), send them index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Optional: If you add CSS or client-side JS files later, put them in a 'public' folder
+// and uncomment this line:
+// app.use(express.static(path.join(__dirname, 'public')));
+
+
 // --- Game State ---
-let players = {}; // Store player data { id: { ws, username, x, y, color, isAlive, size } }
-let obstacles = []; // Store obstacle data { id, x, y, vx, vy, size }
+let players = {};
+let obstacles = [];
 let level = 1;
-let score = 0; // Time-based score
+let score = 0;
 let gameTimeStart = Date.now();
 let nextObstacleId = 0;
-let nextPlayerId = 0; // Simple way to assign unique IDs
+let nextPlayerId = 0;
 let gameRunning = false;
 let gameLoopInterval = null;
 let spawnTimer = null;
 
-const CANVAS_WIDTH = 1200; // Define a virtual canvas size for the server
+const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 800;
 const PLAYER_SIZE = 15;
 const PLAYER_SPEED = 3.5;
 const OBSTACLE_BASE_SIZE = 25;
 const OBSTACLE_BASE_SPEED = 1.5;
-const LEVEL_SCORE_THRESHOLD = 150; // Score needed per level
-const BASE_SPAWN_INTERVAL = 2500; // Milliseconds
+const LEVEL_SCORE_THRESHOLD = 150;
+const BASE_SPAWN_INTERVAL = 2500;
 
 const COLORS = ['#FF6347', '#4682B4', '#32CD32', '#FFD700', '#6A5ACD', '#FF69B4', '#00CED1', '#FFA07A'];
 let colorIndex = 0;
 
-// --- Helper Functions ---
+// --- Helper Functions (Broadcast, ResetGame, etc. - unchanged) ---
 function broadcast(data) {
     const dataString = JSON.stringify(data);
     wss.clients.forEach(client => {
@@ -51,7 +65,7 @@ function getRandomColor() {
 
 function resetGame() {
     console.log("Resetting game state...");
-    players = {}; // Clear players on full reset (or handle differently if needed)
+    players = {};
     obstacles = [];
     level = 1;
     score = 0;
@@ -63,8 +77,7 @@ function resetGame() {
     spawnTimer = null;
     gameLoopInterval = null;
     wss.clients.forEach(ws => {
-         // Optionally force disconnect or just let them rejoin
-         // ws.close();
+        // ws.close(); // Optionally disconnect
     });
     console.log("Game reset complete.");
 }
@@ -76,9 +89,9 @@ function startGameIfNeeded() {
         gameTimeStart = Date.now();
         level = 1;
         score = 0;
-        obstacles = []; // Clear obstacles on game start
+        obstacles = [];
         startSpawning();
-        gameLoopInterval = setInterval(gameLoop, 1000 / 60); // ~60 FPS
+        gameLoopInterval = setInterval(gameLoop, 1000 / 60);
     }
 }
 
@@ -90,7 +103,6 @@ function stopGameIfEmpty() {
         if (gameLoopInterval) clearInterval(gameLoopInterval);
         spawnTimer = null;
         gameLoopInterval = null;
-        // Optionally reset obstacles/score here or keep state for next player
         obstacles = [];
         score = 0;
         level = 1;
@@ -147,39 +159,32 @@ function startSpawning() {
     spawnTimer = setInterval(spawnObstacle, spawnInterval);
 }
 
-// --- Game Loop ---
+// --- Game Loop (unchanged) ---
 function gameLoop() {
     if (!gameRunning) return;
 
     const now = Date.now();
-    score = Math.floor((now - gameTimeStart) / 100); // Score based on time survived
+    score = Math.floor((now - gameTimeStart) / 100);
 
-    // --- Level Up Check ---
     const neededScore = level * LEVEL_SCORE_THRESHOLD;
     if (score >= neededScore) {
         level++;
         console.log(`--- LEVEL UP! Reached Level ${level} ---`);
-        // Optional: Clear obstacles on level up?
-        // obstacles = [];
-        startSpawning(); // Adjust spawn rate for new level
+        startSpawning();
     }
 
-    // --- Update Obstacles ---
     obstacles = obstacles.filter(o => {
         o.x += o.vx;
         o.y += o.vy;
-        // Simple boundary removal
         return o.x > -o.size * 2 && o.x < CANVAS_WIDTH + o.size * 2 &&
                o.y > -o.size * 2 && o.y < CANVAS_HEIGHT + o.size * 2;
     });
 
-    // --- Collision Detection ---
     const playerIds = Object.keys(players);
     playerIds.forEach(playerId => {
         const player = players[playerId];
-        if (!player.isAlive) return; // Skip dead players for obstacle collision
+        if (!player.isAlive) return;
 
-        // Player vs Obstacle
         for (const obstacle of obstacles) {
             const dx = player.x - obstacle.x;
             const dy = player.y - obstacle.y;
@@ -187,20 +192,19 @@ function gameLoop() {
             if (distance < player.size + obstacle.size / 2) {
                 console.log(`Player ${player.username} hit by obstacle ${obstacle.id}`);
                 player.isAlive = false;
-                // No break here, check all obstacles in one frame
+                 // No break, check all obstacles
             }
         }
     });
 
-    // Player vs Player (Revival) - Check AFTER obstacle collisions
      playerIds.forEach(idA => {
         const playerA = players[idA];
-        if (!playerA.isAlive) return; // Living players revive others
+        if (!playerA.isAlive) return;
 
         playerIds.forEach(idB => {
-            if (idA === idB) return; // Don't check self
+            if (idA === idB) return;
             const playerB = players[idB];
-            if (playerB.isAlive) return; // Can only revive dead players
+            if (playerB.isAlive) return;
 
             const dx = playerA.x - playerB.x;
             const dy = playerA.y - playerB.y;
@@ -213,167 +217,99 @@ function gameLoop() {
         });
     });
 
-
-    // --- Prepare State for Broadcast ---
-    // Only send necessary data
     const broadcastPlayers = {};
     playerIds.forEach(id => {
         const p = players[id];
         broadcastPlayers[id] = {
-            id: p.id,
-            username: p.username,
-            x: p.x,
-            y: p.y,
-            color: p.color,
-            isAlive: p.isAlive,
-            size: p.size
+            id: p.id, username: p.username, x: p.x, y: p.y, color: p.color, isAlive: p.isAlive, size: p.size
         };
     });
 
     const gameState = {
-        type: 'gameState',
-        players: broadcastPlayers,
-        obstacles: obstacles,
-        level: level,
-        score: score
+        type: 'gameState', players: broadcastPlayers, obstacles: obstacles, level: level, score: score
     };
 
-    // --- Broadcast State ---
     broadcast(gameState);
 }
 
 
-// --- WebSocket Connection Handling ---
+// --- WebSocket Connection Handling (mostly unchanged) ---
 wss.on('connection', (ws) => {
     const playerId = nextPlayerId++;
     console.log(`Client connected, assigning ID: ${playerId}`);
 
-    // Initialize player state
     players[playerId] = {
-        id: playerId,
-        ws: ws, // Keep reference for potential direct messages (though we mostly broadcast)
-        username: `Player${playerId}`, // Default username
-        x: CANVAS_WIDTH / 2 + (Math.random() - 0.5) * 100, // Random start near center
+        id: playerId, ws: ws, username: `Player${playerId}`,
+        x: CANVAS_WIDTH / 2 + (Math.random() - 0.5) * 100,
         y: CANVAS_HEIGHT / 2 + (Math.random() - 0.5) * 100,
-        color: getRandomColor(),
-        isAlive: true,
-        size: PLAYER_SIZE,
-        targetX: CANVAS_WIDTH / 2, // For mouse movement
-        targetY: CANVAS_HEIGHT / 2,
-        keys: {} // Store key state
+        color: getRandomColor(), isAlive: true, size: PLAYER_SIZE, targetX: CANVAS_WIDTH / 2, targetY: CANVAS_HEIGHT / 2, keys: {}
     };
 
-    // Send the new player their ID and current level/score
     ws.send(JSON.stringify({ type: 'yourId', id: playerId, currentLevel: level, currentScore: score }));
-
-    // Start game if needed
     startGameIfNeeded();
 
-    // Handle messages from this client
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
-            const player = players[playerId]; // Get player associated with this websocket
+            const player = players[playerId];
+            if (!player) return;
 
-            if (!player) return; // Should not happen normally
-
-            // --- Username Setup ---
             if (data.type === 'setUsername' && data.username) {
-                const sanitizedUsername = data.username.substring(0, 16).replace(/[^a-zA-Z0-9_ ]/g, ''); // Basic sanitize
+                const sanitizedUsername = data.username.substring(0, 16).replace(/[^a-zA-Z0-9_ ]/g, '');
                 console.log(`Player ${playerId} set username to: ${sanitizedUsername}`);
-                player.username = sanitizedUsername || `Player${playerId}`; // Fallback if empty after sanitize
-                // Broadcast the updated player list potentially, or let next game state handle it
+                player.username = sanitizedUsername || `Player${playerId}`;
             }
 
-            // --- Input Handling ---
              if (data.type === 'input') {
-                 if (data.keys) {
-                     player.keys = data.keys; // Update key state
-                 }
-                 if (data.mouse) {
-                     player.targetX = data.mouse.x;
-                     player.targetY = data.mouse.y;
-                     player.useMouse = true; // Flag that mouse is the primary input
-                 } else {
-                     player.useMouse = false; // Keyboard is primary if no mouse data
-                 }
+                 if (data.keys) player.keys = data.keys;
+                 if (data.mouse) { player.targetX = data.mouse.x; player.targetY = data.mouse.y; player.useMouse = true; }
+                 else { player.useMouse = false; }
 
-                 // --- Server-Side Movement Calculation ---
                  if (player.isAlive) {
-                    let dx = 0;
-                    let dy = 0;
-
+                    let dx = 0; let dy = 0;
                     if (player.useMouse) {
-                        const diffX = player.targetX - player.x;
-                        const diffY = player.targetY - player.y;
+                        const diffX = player.targetX - player.x; const diffY = player.targetY - player.y;
                         const dist = Math.sqrt(diffX * diffX + diffY * diffY);
-                        const moveSpeed = PLAYER_SPEED * 1.2; // Slightly faster for mouse follow
-
-                        if (dist > player.size / 2) { // Move if cursor is away from center
-                            dx = (diffX / dist) * moveSpeed;
-                            dy = (diffY / dist) * moveSpeed;
-                            // Prevent overshooting
-                             if (Math.abs(diffX) < Math.abs(dx)) dx = diffX;
-                             if (Math.abs(diffY) < Math.abs(dy)) dy = diffY;
+                        const moveSpeed = PLAYER_SPEED * 1.2;
+                        if (dist > player.size / 2) { dx = (diffX / dist) * moveSpeed; dy = (diffY / dist) * moveSpeed;
+                             if (Math.abs(diffX) < Math.abs(dx)) dx = diffX; if (Math.abs(diffY) < Math.abs(dy)) dy = diffY;
                         }
                     } else {
-                        // Keyboard movement
-                        if (player.keys['w'] || player.keys['arrowup']) dy -= 1;
-                        if (player.keys['s'] || player.keys['arrowdown']) dy += 1;
-                        if (player.keys['a'] || player.keys['arrowleft']) dx -= 1;
-                        if (player.keys['d'] || player.keys['arrowright']) dx += 1;
-
+                        if (player.keys['w'] || player.keys['arrowup']) dy -= 1; if (player.keys['s'] || player.keys['arrowdown']) dy += 1;
+                        if (player.keys['a'] || player.keys['arrowleft']) dx -= 1; if (player.keys['d'] || player.keys['arrowright']) dx += 1;
                         const len = Math.sqrt(dx * dx + dy * dy);
-                        if (len > 0) {
-                            dx = (dx / len) * PLAYER_SPEED;
-                            dy = (dy / len) * PLAYER_SPEED;
-                        }
+                        if (len > 0) { dx = (dx / len) * PLAYER_SPEED; dy = (dy / len) * PLAYER_SPEED; }
                     }
-
-                    player.x += dx;
-                    player.y += dy;
-
-                    // Boundary checks
+                    player.x += dx; player.y += dy;
                     player.x = Math.max(player.size, Math.min(CANVAS_WIDTH - player.size, player.x));
                     player.y = Math.max(player.size, Math.min(CANVAS_HEIGHT - player.size, player.y));
                 }
              }
-
-        } catch (error) {
-            console.error('Failed to parse message or invalid message format:', message, error);
-        }
+        } catch (error) { console.error('Failed to parse message:', message, error); }
     });
 
-    // Handle disconnection
     ws.on('close', () => {
         console.log(`Client ${players[playerId]?.username} (ID: ${playerId}) disconnected.`);
-        delete players[playerId]; // Remove player from state
-        // Stop game if no players left
+        delete players[playerId];
         stopGameIfEmpty();
-        // Broadcast updated player list (or let game state handle it)
         broadcast({ type: 'playerLeft', id: playerId });
     });
 
     ws.on('error', (error) => {
         console.error(`WebSocket error for player ${playerId}:`, error);
-        // Ensure cleanup happens even on error
-        if (players[playerId]) {
-            delete players[playerId];
-            stopGameIfEmpty();
-            broadcast({ type: 'playerLeft', id: playerId });
-        }
+        if (players[playerId]) { delete players[playerId]; stopGameIfEmpty(); broadcast({ type: 'playerLeft', id: playerId }); }
     });
 });
 
-// Start the HTTP server -> WebSocket server starts with it
-server.listen(PORT, () => {
+// --- Start the Server ---
+server.listen(PORT, () => { // <-- Use server.listen (which includes the Express app)
     console.log(`HTTP server listening on port ${PORT}`);
 });
 
-// Graceful shutdown handling (optional but good practice)
+// --- Graceful Shutdown (unchanged) ---
 process.on('SIGINT', () => {
-    console.log('SIGINT signal received: closing HTTP server');
-    wss.clients.forEach(ws => ws.close()); // Close all WebSocket connections
+    console.log('SIGINT signal received: closing server');
+    wss.clients.forEach(ws => ws.close());
     server.close(() => {
         console.log('HTTP server closed');
         process.exit(0);
