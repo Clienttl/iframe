@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Multiplayer Dodge - Lobbies</title>
     <style>
+        /* --- Styles (UNCHANGED from previous version) --- */
         * { box-sizing: border-box; }
         body { margin: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { display: none; background: #222; cursor: none; }
         .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.95); z-index: 10; text-align: center; padding: 20px; }
-        .hidden { display: none !important; } /* Utility class to hide screens */
+        .hidden { display: none !important; }
 
-        /* --- UI Overlay (In-Game) --- */
+        /* UI Overlay (In-Game) */
         #uiOverlay { display: flex; position: absolute; top: 0; left: 0; width: 100%; pointer-events: none; z-index: 5; padding: 15px; justify-content: space-between; align-items: flex-start; }
         #gameInfo { font-size: 20px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 5px; }
         #scoreDisplay, #levelDisplay { margin-bottom: 5px; }
@@ -22,7 +23,7 @@
         .dead-player { text-decoration: line-through; color: #aaa; }
         #lobbyNameDisplay { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 5px; font-size: 18px; }
 
-        /* --- Shared Styles --- */
+        /* Shared Styles */
          h2 { font-size: 36px; margin-bottom: 20px; color: #eee; }
         input[type="text"], input[type="password"] { padding: 10px 15px; font-size: 20px; margin-bottom: 15px; width: 280px; text-align: center; border: 2px solid #555; background-color: #333; color: white; border-radius: 5px; }
         .menuButton { padding: 15px 30px; font-size: 24px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 8px; transition: background 0.3s, transform 0.1s; margin-top: 15px; box-shadow: 0 4px #999; min-width: 180px; display: block; margin-left: auto; margin-right: auto;}
@@ -37,13 +38,12 @@
         .error-message { color: #ff4444; margin-top: 10px; height: 1.2em; font-size: 14px; }
         .info-message { color: #aaa; font-size: 14px; }
 
-        /* --- Username Screen --- */
+        /* Username Screen */
         #usernameScreen {}
         #mouseToggleInfo { margin-top: 15px; color: #bbb; font-size: 14px;}
         #respawnMessage { background: rgba(200, 0, 0, 0.8); color: white; padding: 15px 20px; border-radius: 8px; font-size: 18px; text-align: center; z-index: 20; display: none; white-space: pre-wrap; max-width: 80%; margin-top: 20px;}
 
-
-        /* --- Lobby Browser Screen --- */
+        /* Lobby Browser Screen */
         #lobbyBrowserScreen { justify-content: flex-start; padding-top: 5vh; }
         #lobbyListContainer { width: 80%; max-width: 700px; height: 60vh; background: rgba(255, 255, 255, 0.05); border-radius: 8px; overflow-y: auto; padding: 15px; margin-bottom: 20px; border: 1px solid #444;}
         #lobbyListTable { width: 100%; border-collapse: collapse; }
@@ -54,17 +54,16 @@
         .lobby-passworded::after { content: ' 🔒'; color: gold; font-size: 0.8em; vertical-align: middle; }
         #lobbyActions { display: flex; justify-content: center; gap: 20px; margin-top: 10px; }
 
-        /* --- Create Lobby Screen --- */
+        /* Create Lobby Screen */
         #createLobbyScreen { }
         .form-row { margin-bottom: 15px; }
 
-        /* --- Password Prompt --- */
+        /* Password Prompt */
         #passwordPrompt { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(40, 40, 40, 0.98); padding: 30px 40px; border-radius: 10px; z-index: 50; box-shadow: 0 5px 25px rgba(0,0,0,0.5); border: 1px solid #666; display: none; }
         #passwordPrompt h3 { margin: 0 0 20px 0; font-size: 22px; }
 
-        /* --- Custom Cursor --- */
+        /* Custom Cursor */
         #customCursor { position: absolute; width: 10px; height: 10px; background: rgba(255, 255, 255, 0.7); border-radius: 50%; border: 1px solid white; pointer-events: none; z-index: 100; transform: translate(-50%, -50%); display: none; }
-
     </style>
 </head>
 <body>
@@ -78,7 +77,7 @@
             (WASD/Arrows or Mouse to Move)<br/>
             Press 'M' in-game to toggle mouse control.
         </p>
-         <div id="respawnMessage"></div> <!-- Message area for timeout -->
+         <div id="respawnMessage"></div>
          <div id="connectionStatus" class="info-message" style="margin-top: 10px;"></div>
     </div>
 
@@ -89,9 +88,7 @@
                 <thead>
                     <tr><th>Name</th><th>Players</th><th>Password</th><th>Action</th></tr>
                 </thead>
-                <tbody>
-                    <!-- Lobby rows injected by JS -->
-                </tbody>
+                <tbody></tbody>
             </table>
         </div>
         <div id="lobbyActions">
@@ -155,7 +152,7 @@
     const scoreDisplay = document.getElementById('scoreDisplay');
     const levelDisplay = document.getElementById('levelDisplay');
     const playerListUl = document.getElementById('players');
-    const lobbyNameDisplay = document.getElementById('lobbyNameDisplay'); // Added
+    const lobbyNameDisplay = document.getElementById('lobbyNameDisplay');
 
     const usernameScreen = document.getElementById('usernameScreen');
     const usernameInput = document.getElementById('usernameInput');
@@ -167,14 +164,14 @@
     const lobbyListTableBody = document.getElementById('lobbyListTable').querySelector('tbody');
     const refreshLobbiesBtn = document.getElementById('refreshLobbiesBtn');
     const showCreateLobbyBtn = document.getElementById('showCreateLobbyBtn');
-     const lobbyError = document.getElementById('lobbyError');
+    const lobbyError = document.getElementById('lobbyError');
 
     const createLobbyScreen = document.getElementById('createLobbyScreen');
     const newLobbyNameInput = document.getElementById('newLobbyNameInput');
     const newLobbyPasswordInput = document.getElementById('newLobbyPasswordInput');
     const createLobbySubmitBtn = document.getElementById('createLobbySubmitBtn');
     const cancelCreateLobbyBtn = document.getElementById('cancelCreateLobbyBtn');
-     const createLobbyError = document.getElementById('createLobbyError');
+    const createLobbyError = document.getElementById('createLobbyError');
 
     const passwordPrompt = document.getElementById('passwordPrompt');
     const passwordPromptTitle = document.getElementById('passwordPromptTitle');
@@ -187,39 +184,42 @@
 
     // --- State Variables ---
     let ws = null;
-    let currentScreen = 'username'; // 'username', 'lobbyBrowser', 'createLobby', 'inGame'
+    let currentScreen = 'username';
     let myPlayerId = null;
     let currentLobbyId = null;
     let currentLobbyName = null;
-    let players = {};
-    let obstacles = [];
+    let players = {}; // Cache of player data from server
+    let obstacles = []; // Cache of obstacle data from server
     let currentLevel = 1;
     let currentScore = 0;
     let inputIntervalId = null;
     let animationFrameId = null;
-    let gameActive = false; // Is the game rendering loop running?
+    let gameActive = false; // Is the rendering loop running?
     let useMouseControl = false;
     const keys = {};
     let clientMousePos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    const inputSendInterval = 1000 / 45;
+    const inputSendInterval = 1000 / 45; // Send input often
     let lastSentInputTime = 0;
-    let lobbyToJoin = null; // Store lobby ID when prompting for password
+    let lobbyToJoin = null; // Temp storage for password prompt
 
     // --- Utility Functions ---
     function showScreen(screenName) {
+        // Hide all screens first
         usernameScreen.classList.add('hidden');
         lobbyBrowserScreen.classList.add('hidden');
         createLobbyScreen.classList.add('hidden');
-        uiOverlay.classList.add('hidden'); // In-game UI
+        uiOverlay.classList.add('hidden'); // In-game UI wrapper
         canvas.style.display = 'none';
         customCursor.style.display = 'none';
-        passwordPrompt.style.display = 'none'; // Hide password prompt too
+        passwordPrompt.style.display = 'none';
 
         currentScreen = screenName;
-        lobbyError.textContent = ''; // Clear errors on screen change
+        // Clear context-specific errors
+        lobbyError.textContent = '';
         createLobbyError.textContent = '';
         passwordError.textContent = '';
 
+        // Show the target screen
         switch (screenName) {
             case 'username':
                 usernameScreen.classList.remove('hidden');
@@ -227,8 +227,7 @@
                 break;
             case 'lobbyBrowser':
                 lobbyBrowserScreen.classList.remove('hidden');
-                // Request fresh lobby list when showing browser
-                sendMessage({ type: 'getLobbies' });
+                sendMessage({ type: 'getLobbies' }); // Refresh list when shown
                 break;
             case 'createLobby':
                 createLobbyScreen.classList.remove('hidden');
@@ -236,33 +235,39 @@
                 break;
             case 'inGame':
                 uiOverlay.classList.remove('hidden');
-                canvas.style.display = 'block';
-                customCursor.style.display = 'block';
-                resizeCanvas(); // Ensure canvas size is correct
+                canvas.style.display = 'block'; // <<<< Make visible BEFORE resizing
+                resizeCanvas();                 // <<<< Resize AFTER visible
+                customCursor.style.display = 'block'; // Show custom cursor
                 break;
         }
-        console.log("Switched to screen:", screenName);
+        // console.log("Debug: Switched to screen:", screenName);
     }
 
-     function sendMessage(data) {
+    function sendMessage(data) {
          if (ws && ws.readyState === WebSocket.OPEN) {
-             try {
-                 ws.send(JSON.stringify(data));
-             } catch (error) {
-                 console.error("Error sending message:", data, error);
-             }
-         } else {
-             console.warn("Cannot send message, WebSocket not open:", data);
-             // Optionally try to reconnect or show error
-             setStatusMessage("Connection lost. Please reconnect.", true);
-         }
-     }
+             try { ws.send(JSON.stringify(data)); }
+             catch (error) { console.error("WS Send Error:", data, error); }
+         } else { console.warn("WS not open, cannot send:", data); setStatusMessage("Connection lost.", true); }
+    }
 
-     function setStatusMessage(message, isError = false) {
+    function setStatusMessage(message, isError = false) {
           connectionStatus.textContent = message;
           connectionStatus.style.color = isError ? '#ff4444' : '#aaa';
-     }
+    }
 
+    // --- Canvas Setup ---
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        // console.log("Debug: Canvas resized to", canvas.width, canvas.height);
+    }
+    window.addEventListener('resize', () => {
+        // Only resize if game is active to avoid issues when canvas is hidden
+        if (currentScreen === 'inGame') {
+            resizeCanvas();
+        }
+    });
+    // Initial call might not be needed if resize happens in showScreen('inGame')
 
     // --- WebSocket Connection & Handling ---
     function connectWebSocket(username) {
@@ -276,32 +281,30 @@
         // const wsUrl = `ws://localhost:3000`; // Local
 
         ws = new WebSocket(wsUrl);
-        gameActive = false; // Reset game active flag
+        gameActive = false;
 
         ws.onopen = () => {
             setStatusMessage("Connected. Loading lobbies...");
-            // Don't send username yet, wait for lobby join
-            showScreen('lobbyBrowser'); // Go straight to lobby browser on connect
+            showScreen('lobbyBrowser'); // Go to lobby browser on successful connection
         };
 
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                handleServerMessage(data); // Process message in a separate function
-            } catch (error) {
-                console.error('Error processing message:', event.data, error);
-            }
+                handleServerMessage(data);
+            } catch (error) { console.error('WS Message Parse Error:', event.data, error); }
         };
 
         ws.onerror = (error) => {
             console.error('WebSocket Error:', error);
-            setStatusMessage("Connection error.", true);
+            if (!gameActive && !respawnMessageDiv.textContent) {
+                 setStatusMessage("Connection error. Check server.", true);
+            }
             shutdownClient();
         };
 
         ws.onclose = (event) => {
-            console.log(`WebSocket connection closed. Code: ${event.code}, Reason: ${event.reason}`);
-             // Only show generic message if not closed due to respawn timer
+            console.log(`WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`);
             if (event.code !== 1008 || !respawnMessageDiv.textContent.includes('died recently')) {
                  setStatusMessage("Disconnected.", true);
             }
@@ -310,138 +313,136 @@
     }
 
     function handleServerMessage(data) {
-         // console.log("Received:", data); // DEBUG: Log all messages
+         // console.log("Debug: Received:", data.type, data); // Uncomment for detailed logs
          switch(data.type) {
             case 'lobbyList':
-                populateLobbyList(data.lobbies);
+                if(currentScreen === 'lobbyBrowser') { // Only update if viewing
+                    populateLobbyList(data.lobbies);
+                }
                 break;
             case 'joinSuccess':
-                console.log(`Successfully joined lobby: ${data.lobbyName} (ID: ${data.lobbyId})`);
+                console.log(`Joined lobby: ${data.lobbyName} (${data.lobbyId})`);
                 currentLobbyId = data.lobbyId;
                 currentLobbyName = data.lobbyName;
                 lobbyNameDisplay.textContent = `Lobby: ${currentLobbyName}`;
-                // Now send username AFTER joining
-                sendMessage({ type: 'setUsername', username: usernameInput.value.trim() || `Player...` });
+                sendMessage({ type: 'setUsername', username: usernameInput.value.trim() || `Player_${Math.random().toString(16).substring(2, 6)}` });
                 showScreen('inGame');
-                 // Server should send 'yourId' and 'initialState' after successful join
+                // Expect 'yourId' and 'gameState' messages next from server
                 break;
              case 'createFailed':
                  console.error("Lobby creation failed:", data.reason);
-                 if (currentScreen === 'createLobby') {
-                     createLobbyError.textContent = data.reason || "Failed to create lobby.";
-                 } else {
-                     lobbyError.textContent = data.reason || "Failed to create lobby.";
-                 }
+                 if (currentScreen === 'createLobby') createLobbyError.textContent = data.reason || "Failed.";
+                 else lobbyError.textContent = data.reason || "Failed.";
                  break;
              case 'joinFailed':
                  console.error("Lobby join failed:", data.reason);
-                 if (passwordPrompt.style.display === 'block') {
-                    passwordError.textContent = data.reason || "Failed to join lobby.";
-                 } else {
-                     lobbyError.textContent = data.reason || "Failed to join lobby.";
-                 }
-                 lobbyToJoin = null; // Clear target lobby ID
+                 if (passwordPrompt.style.display === 'block') passwordError.textContent = data.reason || "Failed.";
+                 else lobbyError.textContent = data.reason || "Failed.";
+                 lobbyToJoin = null;
                  break;
              case 'passwordRequired':
                   console.log(`Password required for lobby: ${data.lobbyId}`);
-                  lobbyToJoin = data.lobbyId; // Store the lobby ID we're trying to join
-                  const lobbyInfo = lobbyListTableBody.querySelector(`tr[data-lobby-id="${data.lobbyId}"] td:first-child`);
-                  passwordPromptTitle.textContent = `Enter Password for Lobby: ${lobbyInfo ? lobbyInfo.textContent : data.lobbyId}`;
-                  passwordInput.value = ''; // Clear previous attempts
-                  passwordError.textContent = '';
-                  passwordPrompt.style.display = 'block';
-                  passwordInput.focus();
+                  lobbyToJoin = data.lobbyId;
+                  // Find lobby name from potentially existing table row data for better UX
+                  const row = lobbyListTableBody.querySelector(`tr[data-lobby-id="${data.lobbyId}"]`);
+                  const lname = row ? row.dataset.lobbyName : data.lobbyId;
+                  passwordPromptTitle.textContent = `Enter Password for: ${lname}`;
+                  passwordInput.value = ''; passwordError.textContent = '';
+                  passwordPrompt.style.display = 'block'; passwordInput.focus();
                   break;
              case 'respawnTimeout':
-                  console.log(`Respawn timeout active: ${data.timeLeft}s left.`);
-                  respawnMessageDiv.textContent = `You died recently!\nRespawn available in ${data.timeLeft} seconds.`;
+                  console.log(`Respawn timeout: ${data.timeLeft}s left.`);
+                  respawnMessageDiv.textContent = `Died recently! Respawn in ${data.timeLeft}s.`;
                   respawnMessageDiv.style.display = 'block';
-                  // Cleanup happens in onclose handler
+                  showScreen('username'); // Show prompt screen overlaying the message
+                  // Server closes connection, cleanup in onclose
                   break;
-             case 'yourId': // Server confirms player ID and provides initial game state
+             case 'yourId': // Server confirms player ID & initial state
                   myPlayerId = data.id;
                   currentLevel = data.currentLevel || 1;
                   currentScore = data.currentScore || 0;
-                  console.log(`Received my Player ID: ${myPlayerId}`);
+                  console.log(`Received Player ID: ${myPlayerId}`);
                   if (data.initialState) {
                       players = data.initialState.players || {};
                       obstacles = data.initialState.obstacles || [];
-                      console.log("Applied initial game state from server.");
+                      console.log("Applied initial game state.");
                   }
-                  updateUI(); // Update score/level displays
-                  // Start input sending and rendering loop
-                  if (!inputIntervalId) inputIntervalId = setInterval(sendInput, inputSendInterval);
+                  updateUI();
+                  // Start rendering loop and input sending if not already active
                   if (!gameActive) {
+                      // console.log("Debug: Starting game loop..."); // Verify loop starts
                       gameActive = true;
                       requestAnimationFrame(gameLoop);
                       canvas.style.cursor = 'none';
                       customCursor.style.display = 'block';
                   }
+                  if (!inputIntervalId) {
+                      inputIntervalId = setInterval(sendInput, inputSendInterval);
+                  }
                   break;
-             case 'gameState': // Regular in-game state update
+             case 'gameState': // Regular update when in game
+                  // console.log("Debug: Received gameState: Players=", Object.keys(data.players || {}).length, "Obstacles=", (data.obstacles || []).length); // Less noisy log
                   if (currentScreen === 'inGame') {
                       players = data.players || {};
                       obstacles = data.obstacles || [];
                       if (data.level !== currentLevel) currentLevel = data.level;
                       if (data.score !== currentScore) currentScore = data.score;
-                      updateUI();
+                      updateUI(); // Update score, level, player list
                   }
                   break;
-             case 'levelUp': // Server announced level up
-                  console.log(`Server announced Level Up to ${data.newLevel}`);
+             case 'levelUp':
+                  console.log(`Level Up to ${data.newLevel}`);
                   currentLevel = data.newLevel;
-                  updateUI();
-                  // Add visual effect if desired
+                  updateUI(); // Update level display
+                  // Add visual effect?
                   break;
-             // Ignore 'playerLeft' for now, let gameState handle removal visually
+             // 'playerLeft' is handled implicitly by gameState not including them anymore
          }
     }
 
     function shutdownClient() {
-         console.log("Shutting down client state...");
-         gameActive = false;
-         if (ws) { ws.onclose = null; ws.onerror = null; ws.onmessage = null; ws.onopen = null; if(ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close(); ws = null; }
+         console.log("Shutting down client...");
+         gameActive = false; // Stop render loop flag
+         if (ws) { ws.onclose = null; ws.onerror = null; ws.onmessage = null; ws.onopen = null; if(ws.readyState < 2) ws.close(); ws = null; } // Check readyState < CLOSING/CLOSED
          if (inputIntervalId) { clearInterval(inputIntervalId); inputIntervalId = null; }
          if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
          myPlayerId = null; currentLobbyId = null; currentLobbyName = null;
          players = {}; obstacles = []; currentLevel = 1; currentScore = 0;
          keys = {}; useMouseControl = false; lobbyToJoin = null;
 
-         // Reset UI
          showScreen('username'); // Go back to username screen
          canvas.style.cursor = 'default';
          customCursor.style.display = 'none';
          connectBtn.disabled = false;
          usernameInput.disabled = false;
-         lobbyListTableBody.innerHTML = ''; // Clear lobby list
+         lobbyListTableBody.innerHTML = '';
          updateUI(); // Clear player list etc.
-          // Don't clear respawn message - it should persist until next connect attempt
+         // Don't clear respawn message automatically
          setStatusMessage("Disconnected.");
     }
 
     // --- Lobby Browser Logic ---
     function populateLobbyList(lobbyData) {
-        lobbyListTableBody.innerHTML = ''; // Clear previous list
-        if (!lobbyData || Object.keys(lobbyData).length === 0) {
+        lobbyListTableBody.innerHTML = '';
+        if (!lobbyData || lobbyData.length === 0) { // Check length for arrays
              lobbyListTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #aaa;">No lobbies found. Create one!</td></tr>';
              return;
         }
-        lobbyError.textContent = ''; // Clear errors
+        lobbyError.textContent = '';
 
-        Object.values(lobbyData).sort((a,b) => a.name.localeCompare(b.name)).forEach(lobby => {
+        // Use the array directly if server sends array
+        lobbyData.sort((a,b) => a.name.localeCompare(b.name)).forEach(lobby => {
              const row = document.createElement('tr');
              row.dataset.lobbyId = lobby.id;
-             row.dataset.lobbyName = lobby.name; // Store name for prompts
+             row.dataset.lobbyName = lobby.name;
              row.dataset.passwordProtected = lobby.passwordProtected;
 
              const nameCell = document.createElement('td');
              nameCell.textContent = lobby.name;
-             if (lobby.passwordProtected) {
-                 nameCell.classList.add('lobby-passworded');
-             }
+             if (lobby.passwordProtected) nameCell.classList.add('lobby-passworded');
 
              const playersCell = document.createElement('td');
-             playersCell.textContent = `${lobby.playerCount}`; // Add max players later if needed
+             playersCell.textContent = `${lobby.playerCount}`;
 
              const passwordCell = document.createElement('td');
              passwordCell.textContent = lobby.passwordProtected ? 'Yes' : 'No';
@@ -451,36 +452,29 @@
              joinBtn.textContent = 'Join';
              joinBtn.classList.add('menuButton', 'smallButton', 'secondaryButton');
              joinBtn.onclick = (e) => {
-                 e.stopPropagation(); // Prevent row click if button is clicked
+                 e.stopPropagation();
                  attemptJoinLobby(lobby.id, lobby.name, lobby.passwordProtected);
              };
              actionCell.appendChild(joinBtn);
 
-             row.appendChild(nameCell);
-             row.appendChild(playersCell);
-             row.appendChild(passwordCell);
-             row.appendChild(actionCell);
+             row.appendChild(nameCell); row.appendChild(playersCell);
+             row.appendChild(passwordCell); row.appendChild(actionCell);
 
-             // Make row clickable too
-             row.onclick = () => {
+             row.onclick = () => { // Make row clickable
                  attemptJoinLobby(lobby.id, lobby.name, lobby.passwordProtected);
              };
-
              lobbyListTableBody.appendChild(row);
          });
     }
 
     function attemptJoinLobby(lobbyId, lobbyName, isPasswordProtected) {
-         lobbyError.textContent = ''; // Clear previous errors
+         lobbyError.textContent = '';
          if (isPasswordProtected) {
-              lobbyToJoin = lobbyId; // Store the lobby ID we're trying to join
-              passwordPromptTitle.textContent = `Enter Password for Lobby: ${lobbyName}`;
-              passwordInput.value = '';
-              passwordError.textContent = '';
-              passwordPrompt.style.display = 'block';
-              passwordInput.focus();
+              lobbyToJoin = lobbyId;
+              passwordPromptTitle.textContent = `Enter Password for: ${lobbyName}`;
+              passwordInput.value = ''; passwordError.textContent = '';
+              passwordPrompt.style.display = 'block'; passwordInput.focus();
          } else {
-             // Join directly if no password
              sendMessage({ type: 'joinLobby', lobbyId: lobbyId });
          }
     }
@@ -489,11 +483,10 @@
     document.addEventListener('keydown', (e) => {
         const key = e.key.toLowerCase();
         keys[key] = true;
-        // Toggle Mouse Control only when in game
         if (key === 'm' && currentScreen === 'inGame') {
             useMouseControl = !useMouseControl;
-            console.log("Mouse control toggled:", useMouseControl);
-            sendInput(true); // Force send immediate update
+            // console.log("Debug: Mouse control:", useMouseControl);
+            sendInput(true); // Force send update
         }
     });
     document.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
@@ -518,77 +511,112 @@
         if (useMouseControl) { inputData.mousePos = { x: clientMousePos.x, y: clientMousePos.y }; }
         else { const activeKeys = {}; for (const key in keys) { if (keys[key]) activeKeys[key] = true; } inputData.keys = activeKeys; }
 
-        sendMessage(inputData); // Use helper function
+        sendMessage(inputData);
         lastSentInputTime = now;
     }
 
-    // --- Drawing & UI Update --- (Mostly unchanged from previous version)
-    function drawPlayer(player) { /* ... Same as before ... */ }
-    function drawObstacle(obstacle) { /* ... Same as before ... */ }
+    // --- Drawing & UI Update ---
+    function drawPlayer(player) {
+        if (!player) return; // Safety
+        ctx.save();
+        ctx.lineWidth = 1;
+        if (!player.isAlive) { ctx.globalAlpha = 0.4; ctx.fillStyle = '#AAAAAA'; ctx.strokeStyle = 'black'; }
+        else { ctx.globalAlpha = 1.0; ctx.fillStyle = player.color || 'white'; ctx.strokeStyle = 'black'; }
+
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.size || 15, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (player.id === myPlayerId) { ctx.strokeStyle = 'white'; ctx.lineWidth = 2; }
+        ctx.stroke();
+
+        ctx.fillStyle = player.isAlive ? 'white' : '#ddd';
+        ctx.font = '12px Segoe UI';
+        ctx.textAlign = 'center';
+        if (typeof player.x === 'number' && typeof player.y === 'number') {
+             ctx.fillText(player.username || `Player ${player.id}`, player.x, player.y - (player.size || 15) - 5);
+        }
+        ctx.restore();
+    }
+
+    function drawObstacle(obstacle) {
+         if (!obstacle) return;
+         ctx.fillStyle = obstacle.color || '#ff4444';
+         ctx.beginPath();
+         const radius = (obstacle.size || OBSTACLE_BASE_SIZE) / 2;
+         if (typeof obstacle.x === 'number' && typeof obstacle.y === 'number' && radius > 0) {
+            ctx.arc(obstacle.x, obstacle.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+         } else {
+             // console.warn("Invalid obstacle data for drawing:", obstacle); // Debug if needed
+         }
+    }
+
     function updateUI() {
         if (scoreDisplay) scoreDisplay.textContent = `Score: ${currentScore}`;
         if (levelDisplay) levelDisplay.textContent = `Level: ${currentLevel}`;
         updatePlayerList();
     }
-    function updatePlayerList() { /* ... Same as before ... */ }
+
+    function updatePlayerList() {
+         if (!playerListUl) return;
+         playerListUl.innerHTML = '';
+         Object.values(players).forEach(player => { // Use local 'players' cache
+              if (!player) return;
+             const li = document.createElement('li');
+             li.style.color = player.color || 'white';
+             li.textContent = player.username || `Player ${player.id}`;
+             if (!player.isAlive) li.classList.add('dead-player');
+             if (player.id === myPlayerId) { li.textContent += ' (You)'; li.style.fontWeight = 'bold'; }
+             playerListUl.appendChild(li);
+         });
+     }
 
     // --- Game Loop (Rendering) ---
     function gameLoop(timestamp) {
         if (!gameActive || currentScreen !== 'inGame') { animationFrameId = null; return; }
+        // console.log("Debug: Render frame tick"); // Uncomment to verify loop runs
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Use the locally cached state
         obstacles.forEach(drawObstacle);
-        Object.values(players).forEach(drawPlayer);
+        Object.values(players).forEach(drawPlayer); // Draw based on local 'players' object
+
         animationFrameId = requestAnimationFrame(gameLoop);
     }
 
     // --- Event Listeners for Buttons ---
     connectBtn.addEventListener('click', () => {
         const username = usernameInput.value.trim();
-        // Username is set AFTER joining lobby now
         connectWebSocket(username || `Player${Math.floor(Math.random()*1000)}`);
     });
     usernameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') connectBtn.click(); });
 
-    refreshLobbiesBtn.addEventListener('click', () => {
-         lobbyError.textContent = '';
-         sendMessage({ type: 'getLobbies' });
-    });
-    showCreateLobbyBtn.addEventListener('click', () => {
-         newLobbyNameInput.value = '';
-         newLobbyPasswordInput.value = '';
-         createLobbyError.textContent = '';
-         showScreen('createLobby');
-    });
+    refreshLobbiesBtn.addEventListener('click', () => { lobbyError.textContent = ''; sendMessage({ type: 'getLobbies' }); });
+    showCreateLobbyBtn.addEventListener('click', () => { newLobbyNameInput.value = ''; newLobbyPasswordInput.value = ''; createLobbyError.textContent = ''; showScreen('createLobby'); });
     cancelCreateLobbyBtn.addEventListener('click', () => { showScreen('lobbyBrowser'); });
     createLobbySubmitBtn.addEventListener('click', () => {
         const name = newLobbyNameInput.value.trim();
-        const pass = newLobbyPasswordInput.value; // Don't trim password
-        createLobbyError.textContent = ''; // Clear previous errors
-        if (!name) {
-             createLobbyError.textContent = 'Lobby name is required.';
-             return;
-        }
+        const pass = newLobbyPasswordInput.value;
+        createLobbyError.textContent = '';
+        if (!name) { createLobbyError.textContent = 'Lobby name is required.'; return; }
         sendMessage({ type: 'createLobby', lobbyName: name, password: pass || null });
-         // Stay on this screen, wait for joinSuccess or createFailed message
     });
 
-    passwordCancelBtn.addEventListener('click', () => {
-        passwordPrompt.style.display = 'none';
-        lobbyToJoin = null; // Clear target lobby ID
-    });
+    passwordCancelBtn.addEventListener('click', () => { passwordPrompt.style.display = 'none'; lobbyToJoin = null; });
     passwordSubmitBtn.addEventListener('click', () => {
         if (lobbyToJoin) {
-            const pass = passwordInput.value;
-            passwordError.textContent = ''; // Clear previous errors
+            const pass = passwordInput.value; passwordError.textContent = '';
             sendMessage({ type: 'joinLobby', lobbyId: lobbyToJoin, password: pass });
-            passwordPrompt.style.display = 'none'; // Hide prompt while trying
+            passwordPrompt.style.display = 'none'; // Hide while trying
         }
     });
-     passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') passwordSubmitBtn.click(); });
+    passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') passwordSubmitBtn.click(); });
 
     // --- Initial Setup ---
     showScreen('username'); // Start at username screen
-    // resizeCanvas called inside showScreen('inGame') when needed
+    setStatusMessage("Ready to connect."); // Initial status
 
 })(); // End IIFE
 </script>
