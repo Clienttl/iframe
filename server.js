@@ -95,6 +95,26 @@ function cleanupDeadIPs() {
 }
 setInterval(cleanupDeadIPs, IP_CLEANUP_INTERVAL);
 
+
+// --- Helper to format player data for broadcast ---
+function getLobbyPlayersForBroadcast(lobbyId) {
+    const lobby = lobbies[lobbyId];
+    if (!lobby) return {};
+
+    const broadcastPlayers = {};
+    Object.keys(lobby.players).forEach(id => {
+        const pLobby = lobby.players[id];
+        const pGlobal = players[id]; // Need global for username
+        if(pLobby && pGlobal) {
+            broadcastPlayers[id] = {
+                id: id, username: pGlobal.username, x: pLobby.x, y: pLobby.y,
+                color: pLobby.color, isAlive: pLobby.isAlive, size: pLobby.size
+            };
+        }
+    });
+    return broadcastPlayers;
+}
+
 // --- Lobby Management ---
 
 function createLobby(lobbyName, password = null) {
@@ -162,7 +182,7 @@ function addPlayerToLobby(playerId, lobbyId) {
         keys: {}
     };
 
-    console.log(`Player ${player.username} (${playerId}) successfully joined lobby "${lobby.name}" (${lobbyId})`);
+    console.log(`Player ${player.username} (${playerId}) successfully added to lobby "${lobby.name}" (${lobbyId}) players.`);
     startGameIfNeeded(lobbyId); // Attempt to start this lobby's game loop if not running
     return true;
 }
@@ -375,17 +395,7 @@ function gameLoop(lobbyId) {
     });
 
     // --- Prepare State for Broadcast ---
-    const broadcastPlayers = {};
-     playerIdsInLobby.forEach(id => {
-        const pLobby = lobby.players[id];
-        const pGlobal = players[id];
-        if(pLobby && pGlobal) {
-            broadcastPlayers[id] = {
-                id: id, username: pGlobal.username, x: pLobby.x, y: pLobby.y,
-                color: pLobby.color, isAlive: pLobby.isAlive, size: pLobby.size
-            };
-        }
-    });
+    const broadcastPlayers = getLobbyPlayersForBroadcast(lobbyId); // Use helper
 
     const gameState = {
         type: 'gameState', players: broadcastPlayers, obstacles: lobby.obstacles,
@@ -442,9 +452,9 @@ wss.on('connection', (ws, req) => {
 
         // --- Message Routing ---
         if (!currentLobbyId) { // === BEFORE LOBBY ===
-            handleLobbyBrowserCommands(playerId, data);
+            handleLobbyBrowserCommands(playerId, data); // Pass player ID and message data
         } else { // === IN LOBBY ===
-             handleInGameCommands(playerId, player, lobby, playerLobbyData, data);
+             handleInGameCommands(playerId, player, lobby, playerLobbyData, data); // Pass more context
         }
     }); // --- End ws.on('message') ---
 
@@ -495,9 +505,18 @@ function handleLobbyBrowserCommands(playerId, data) {
             if (nameExists) {
                 sendToClient(playerId, { type: 'createFailed', reason: `Lobby name "${name}" already exists.` }); return;
             }
+
             const newLobby = createLobby(name, pass);
             if (addPlayerToLobby(playerId, newLobby.id)) {
-                sendToClient(playerId, { type: 'joinSuccess', lobbyId: newLobby.id, lobbyName: newLobby.name });
+                // Send success message WITH ID and initial state
+                const initialState = {
+                    players: getLobbyPlayersForBroadcast(newLobby.id),
+                    obstacles: newLobby.obstacles, level: newLobby.level, score: newLobby.score
+                };
+                sendToClient(playerId, {
+                    type: 'joinSuccess', lobbyId: newLobby.id, lobbyName: newLobby.name,
+                    playerId: playerId, initialState: initialState
+                });
                 broadcastLobbyListUpdate();
             } else {
                 sendToClient(playerId, { type: 'createFailed', reason: 'Failed to add player to new lobby.' });
@@ -512,8 +531,17 @@ function handleLobbyBrowserCommands(playerId, data) {
                 if (typeof data.password !== 'string') { sendToClient(playerId, { type: 'passwordRequired', lobbyId: data.lobbyId }); return; }
                 if (data.password !== targetLobby.password) { sendToClient(playerId, { type: 'joinFailed', reason: 'Incorrect password.' }); return; }
             }
+
             if (addPlayerToLobby(playerId, data.lobbyId)) {
-                sendToClient(playerId, { type: 'joinSuccess', lobbyId: targetLobby.id, lobbyName: targetLobby.name });
+                 // Send success message WITH ID and initial state
+                 const initialState = {
+                    players: getLobbyPlayersForBroadcast(targetLobby.id),
+                    obstacles: targetLobby.obstacles, level: targetLobby.level, score: targetLobby.score
+                 };
+                sendToClient(playerId, {
+                    type: 'joinSuccess', lobbyId: targetLobby.id, lobbyName: targetLobby.name,
+                    playerId: playerId, initialState: initialState
+                });
                 broadcastLobbyListUpdate();
             } else { sendToClient(playerId, { type: 'joinFailed', reason: 'Failed to add player (error/full?).' }); }
             break;
@@ -524,14 +552,8 @@ function handleLobbyBrowserCommands(playerId, data) {
 
 function handleInGameCommands(playerId, playerGlobal, lobby, playerLobbyData, data) {
     // Safety checks
-    if (!lobby) {
-         console.error(`InGameCmd Error: Player ${playerId} has lobbyId ${playerGlobal.lobbyId}, but lobby missing!`);
-         playerGlobal.lobbyId = null; playerGlobal.ws.close(1011, "Internal server error - lobby data lost"); return;
-    }
-     if (!playerLobbyData) {
-          console.error(`InGameCmd Error: Player ${playerId} in lobby ${playerGlobal.lobbyId}, but player data missing from lobby!`);
-          delete lobby.players[playerId]; playerGlobal.lobbyId = null; playerGlobal.ws.close(1011, "Internal server error - player lobby data lost"); return;
-     }
+    if (!lobby) { console.error(`InGameCmd Error: Player ${playerId} lobby missing!`); playerGlobal.lobbyId = null; playerGlobal.ws.close(1011); return; }
+    if (!playerLobbyData) { console.error(`InGameCmd Error: Player ${playerId} lobby data missing!`); delete lobby.players[playerId]; playerGlobal.lobbyId = null; playerGlobal.ws.close(1011); return; }
 
     // Handle in-game messages
     switch(data.type) {
@@ -539,7 +561,6 @@ function handleInGameCommands(playerId, playerGlobal, lobby, playerLobbyData, da
              if (typeof data.username === 'string') {
                 const sanitizedUsername = data.username.substring(0, 16).replace(/[^a-zA-Z0-9_.\- ]/g, '');
                 if (playerGlobal.username !== sanitizedUsername) {
-                    // console.log(`Lobby ${playerGlobal.lobbyId}: Player ${playerId} user -> ${sanitizedUsername}`); // Can be noisy
                     playerGlobal.username = sanitizedUsername || `Player_${playerId.substring(0,4)}`;
                 }
             }
@@ -548,18 +569,19 @@ function handleInGameCommands(playerId, playerGlobal, lobby, playerLobbyData, da
             if (data.keys) playerLobbyData.keys = data.keys;
             if (data.mousePos) playerLobbyData.mousePos = data.mousePos;
             if (typeof data.useMouse === 'boolean') playerLobbyData.useMouse = data.useMouse;
-
-            // Apply movement calculation immediately based on received input
+            // Apply movement calculation immediately
             if (playerLobbyData.isAlive) {
-                if (playerLobbyData.useMouse && playerLobbyData.mousePos) {
-                    playerLobbyData.x = playerLobbyData.mousePos.x; playerLobbyData.y = playerLobbyData.mousePos.y;
-                } else {
+                if (playerLobbyData.useMouse && playerLobbyData.mousePos) { // Direct mouse position
+                    playerLobbyData.x = playerLobbyData.mousePos.x;
+                    playerLobbyData.y = playerLobbyData.mousePos.y;
+                } else { // Keyboard movement
                     let dx = 0, dy = 0;
                     if (playerLobbyData.keys['w'] || playerLobbyData.keys['arrowup']) dy -= 1; if (playerLobbyData.keys['s'] || playerLobbyData.keys['arrowdown']) dy += 1;
                     if (playerLobbyData.keys['a'] || playerLobbyData.keys['arrowleft']) dx -= 1; if (playerLobbyData.keys['d'] || playerLobbyData.keys['arrowright']) dx += 1;
                     const len = Math.sqrt(dx * dx + dy * dy);
                     if (len > 0) { dx = (dx / len) * PLAYER_SPEED; dy = (dy / len) * PLAYER_SPEED; }
-                    playerLobbyData.x += dx; playerLobbyData.y += dy;
+                    playerLobbyData.x += dx;
+                    playerLobbyData.y += dy;
                 }
                 // Clamp position
                 playerLobbyData.x = Math.max(playerLobbyData.size, Math.min(CANVAS_WIDTH - playerLobbyData.size, playerLobbyData.x));
@@ -596,6 +618,7 @@ server.listen(PORT, () => {
 // --- Graceful Shutdown ---
 process.on('SIGINT', () => {
     console.log('SIGINT signal received: closing server gracefully...');
+    // Stop all lobby loops first
     Object.keys(lobbies).forEach(lobbyId => {
         const lobby = lobbies[lobbyId];
         if (lobby) {
