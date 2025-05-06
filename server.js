@@ -27,7 +27,7 @@ const PLAYER_SPEED = 3.5; // Base speed for keyboard
 const OBSTACLE_BASE_SIZE = 25;
 const OBSTACLE_BASE_SPEED = 1.5;
 const LEVEL_SCORE_THRESHOLD = 150;
-const BASE_SPAWN_INTERVAL = 2500; // Base milliseconds
+const BASE_SPAWN_INTERVAL = 100; // Base milliseconds
 const SPEED_LEVEL_MULTIPLIER = 0.20; // e.g., Lvl 2 speed = base * (1 + 1 * 0.20)
 const SPAWN_RATE_LEVEL_MULTIPLIER = 0.25; // e.g., Lvl 2 interval = base / (1 + 1 * 0.25)
 const SIZE_VARIANCE_LEVEL_MULTIPLIER = 1.5; // Extra random pixels added to max size per level
