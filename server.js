@@ -1,11 +1,7 @@
-import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const express = require('express');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
 
 const app = express();
 const server = createServer(app);
@@ -13,33 +9,27 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// In-memory state
-const onlineUsers = new Map(); // username -> socket.id
-const messages = []; // global chat history
-const typingUsers = new Set(); // usernames typing
-const friendRequests = {}; // username -> array of pending requests
-const friends = {}; // username -> array of friend usernames
+const onlineUsers = new Map();
+const messages = [];
+const typingUsers = new Set();
+const friendRequests = {};
+const friends = {};
 
 io.on('connection', (socket) => {
     let username = null;
 
     socket.on('set username', (name, callback) => {
         name = name.trim();
-        if (!name) {
-            return callback({ success: false, message: 'Username cannot be empty' });
-        }
-        if (onlineUsers.has(name)) {
-            return callback({ success: false, message: 'Username is taken' });
-        }
+        if (!name) return callback({ success: false, message: 'Username cannot be empty' });
+        if (onlineUsers.has(name)) return callback({ success: false, message: 'Username is taken' });
         username = name;
         onlineUsers.set(username, socket.id);
         friendRequests[username] = friendRequests[username] || [];
         friends[username] = friends[username] || [];
         io.emit('user list', Array.from(onlineUsers.keys()));
-        callback({ success: true, message: 'Username set', messages });
+        callback({ success: true, messages });
     });
 
-    // Global chat messages
     socket.on('chat message', (msg) => {
         if (!username) return;
         const messageObj = { username, text: msg, time: new Date().toLocaleTimeString() };
@@ -48,7 +38,6 @@ io.on('connection', (socket) => {
         io.emit('chat message', messageObj);
     });
 
-    // Typing indicator
     socket.on('typing', (isTyping) => {
         if (!username) return;
         if (isTyping) typingUsers.add(username);
@@ -56,7 +45,6 @@ io.on('connection', (socket) => {
         io.emit('typing users', Array.from(typingUsers));
     });
 
-    // Friend request system
     socket.on('send friend request', (target) => {
         if (!username || !onlineUsers.has(target) || target === username) return;
         friendRequests[target] = friendRequests[target] || [];
