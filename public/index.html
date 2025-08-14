@@ -1,39 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Google</title>
+  <meta charset="UTF-8">
+  <title>Discord-Style Chat</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- LOGIN SCREEN -->
   <div id="login-screen">
-    <h1>Welcome</h1>
-    <input id="username-input" placeholder="Username">
-    <input id="admin-code" placeholder="Admin Code (optional)">
-    <button id="login-btn">Join</button>
-    <div id="login-error"></div>
+    <div class="login-card">
+      <h1 class="login-title">Welcome</h1>
+      <input id="username-input" class="input" placeholder="Username">
+      <input id="admin-code" class="input" placeholder="Admin Code (optional)">
+      <button id="login-btn" class="btn primary">Join Chat</button>
+      <div id="login-error" class="error"></div>
+    </div>
   </div>
 
-  <div id="chat-screen" style="display:none;">
-    <div id="sidebar">
-      <h3>Friends</h3>
-      <ul id="friends"></ul>
-      <h3>Friend Requests</h3>
-      <ul id="requests"></ul>
-      <input id="add-friend" placeholder="Add Friend">
-      <button id="send-friend-btn">Send</button>
-      <div id="admin-panel" style="display:none;">
+  <!-- CHAT SCREEN -->
+  <div id="chat-screen" class="app hidden">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="section">
+        <div class="section-head">Friends</div>
+        <ul id="friends" class="list"></ul>
+      </div>
+      <div class="section">
+        <div class="section-head">Friend Requests</div>
+        <ul id="requests" class="list"></ul>
+        <input id="add-friend" class="input" placeholder="Add Friend">
+        <button id="send-friend-btn" class="btn primary">Send Request</button>
+      </div>
+      <div id="admin-panel" class="admin hidden">
         <h3>Admin Panel</h3>
-        <ul id="online-users"></ul>
-        <button id="refresh-admin">Refresh Data</button>
+        <div id="online-users"></div>
+        <button id="refresh-admin" class="btn xs">Refresh Data</button>
       </div>
     </div>
 
-    <div id="chat-area">
-      <div id="messages"></div>
-      <div id="typing-indicator"></div>
-      <form id="message-form">
-        <input id="message-input" autocomplete="off" placeholder="Type a message...">
-        <button>Send</button>
+    <!-- CHAT AREA -->
+    <div class="main">
+      <div class="chat-header">
+        <div class="chat-title" id="chat-title">Select a Friend</div>
+        <div class="header-actions" id="header-actions"></div>
+      </div>
+      <div class="messages" id="messages"></div>
+      <div class="typing" id="typing-indicator"></div>
+      <form id="message-form" class="composer">
+        <input id="message-input" class="input" placeholder="Type a message...">
+        <button class="btn primary">Send</button>
       </form>
     </div>
   </div>
