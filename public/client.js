@@ -1,150 +1,134 @@
-// -------------------------
-// Simple DM Chat (friends-only) client
-// - Persists username + DMs in localStorage
-// - Friend requests (send/accept/decline)
-// - Per-DM typing indicator
-// -------------------------
+// ===== Friends-only DM client with admin & localStorage =====
 const socket = io();
 
-// ---- DOM
+// ------- DOM -------
 const loginScreen = document.getElementById('login-screen');
-const app = document.getElementById('app');
-const meNameEl = document.getElementById('me-name');
-const meAvatar = document.getElementById('me-avatar');
-const loginBtn = document.getElementById('login-btn');
-const usernameInput = document.getElementById('username-input');
-const loginErr = document.getElementById('login-error');
-const logoutBtn = document.getElementById('logout-btn');
+const chatScreen  = document.getElementById('chat-screen') || document.querySelector('.app'); // support both layouts
+const usernameIn  = document.getElementById('username-input');
+const adminCodeIn = document.getElementById('admin-code');
+const loginBtn    = document.getElementById('login-btn');
+const loginErr    = document.getElementById('login-error');
 
-const friendsList = document.getElementById('friends-list');
-const requestsList = document.getElementById('requests-list');
+const meNameEl    = document.getElementById('me-name');
+const meAvatarEl  = document.getElementById('me-avatar');
+const logoutBtn   = document.getElementById('logout-btn');
 
-const chatTitle = document.getElementById('chat-title');
-const chatStatus = document.getElementById('chat-status');
-const headerActions = document.getElementById('header-actions');
-const messagesEl = document.getElementById('messages');
-const typingEl = document.getElementById('typing-indicator');
-const composer = document.getElementById('composer');
-const input = document.getElementById('message-input');
+const friendsUL   = document.getElementById('friends') || document.getElementById('friends-list');
+const requestsUL  = document.getElementById('requests') || document.getElementById('requests-list');
+const addFriendIn = document.getElementById('add-friend') || document.getElementById('add-username');
+const sendFriendBtn = document.getElementById('send-friend-btn') || document.getElementById('send-request');
 
-const modal = document.getElementById('modal');
-const modalClose = document.getElementById('modal-close');
-const newDmBtn = document.getElementById('new-dm-btn');
-const sendReqBtn = document.getElementById('send-request');
-const addUsername = document.getElementById('add-username');
-const modalMsg = document.getElementById('modal-msg');
+const chatTitle   = document.getElementById('chat-title') || { textContent: '' };
+const chatStatus  = document.getElementById('chat-status') || { textContent: '' };
+const headerActions = document.getElementById('header-actions') || document.createElement('div');
 
-// ---- Local state (persisted)
-const LS_KEY = 'dmchat:v1';
+const messagesEl  = document.getElementById('messages');
+const typingEl    = document.getElementById('typing-indicator');
+const form        = document.getElementById('message-form') || document.getElementById('composer');
+const input       = document.getElementById('message-input');
+const sendBtn     = document.getElementById('send-btn');
+
+const adminPanel  = document.getElementById('admin-panel');
+const adminUsers  = document.getElementById('online-users');
+const refreshAdmin = document.getElementById('refresh-admin');
+
+// ------- Local state -------
+const LS_KEY = 'dmchat:v2';
 function loadState(){
-  try { return JSON.parse(localStorage.getItem(LS_KEY)) || { username:null, friends:[], chats:{}, requests:[] }; }
-  catch { return { username:null, friends:[], chats:{}, requests:[] }; }
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || { username:null, friends:[], requests:[], chats:{}, isAdmin:false }; }
+  catch { return { username:null, friends:[], requests:[], chats:{}, isAdmin:false }; }
 }
-function saveState(s){ localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+function saveState(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 let state = loadState();
 
-// Derived/UI state
-let activeFriend = null;
-let typingTimers = {}; // friend -> timeout id
+let activeFriend = null;            // who we're chatting with
+let typingTimers = {};              // friend -> timeout id
+let bound = false;                  // prevent duplicate bindings
 
-// ---- Helpers
-const initials = (name='?') => name.slice(0,2).toUpperCase();
-const toast = (msg, kind='info') => {
-  modalMsg.textContent = msg;
-  modalMsg.style.color = (kind==='error') ? '#d83c3e' : (kind==='ok' ? '#23a55a' : '#b5b8bf');
-  setTimeout(()=> { modalMsg.textContent=''; }, 2000);
-};
+// ------- Helpers -------
+const initials = (s='?') => s.slice(0,2).toUpperCase();
+const nowTime  = () => new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+const keyForPair = (a,b) => [a,b].sort().join('|');
+
 function upsertFriend(name, online=null){
   if (!name) return;
-  const idx = state.friends.findIndex(f=>f.name===name);
-  if (idx === -1) state.friends.push({ name, online: !!online });
-  else if (online!==null) state.friends[idx].online = !!online;
-  saveState(state);
+  const i = state.friends.findIndex(f=>f.name===name);
+  if (i === -1) state.friends.push({ name, online: !!online });
+  else if (online !== null) state.friends[i].online = !!online;
+  saveState();
 }
-function setRequests(list){
-  state.requests = Array.from(new Set(list || []));
-  saveState(state);
-}
-function addChatMsg(friend, msg){
+function setRequests(list){ state.requests = Array.from(new Set(list||[])); saveState(); }
+function appendDM(friend, msg){
   state.chats[friend] = state.chats[friend] || [];
   state.chats[friend].push(msg);
-  if (state.chats[friend].length > 400) state.chats[friend].shift();
-  saveState(state);
-}
-function timeNow(){
-  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  if (state.chats[friend].length > 500) state.chats[friend].shift();
+  saveState();
 }
 
-// ---- UI Renders
+// ------- Renderers -------
 function renderMe(){
-  meNameEl.textContent = state.username || 'me';
-  meAvatar.textContent = initials(state.username || '?');
+  if (meNameEl) meNameEl.textContent = state.username || 'me';
+  if (meAvatarEl) meAvatarEl.textContent = initials(state.username||'?');
 }
 function renderFriends(){
-  friendsList.innerHTML = '';
-  const sorted = [...state.friends].sort((a,b)=> Number(b.online)-Number(a.online) || a.name.localeCompare(b.name));
-  for(const f of sorted){
+  if (!friendsUL) return;
+  friendsUL.innerHTML = '';
+  const list = [...state.friends].sort((a,b)=> Number(b.online)-Number(a.online) || a.name.localeCompare(b.name));
+  for (const f of list){
     const li = document.createElement('li');
-    const dot = document.createElement('span');
-    dot.className = 'dot' + (f.online ? ' online' : '');
-    const av = document.createElement('div');
-    av.className = 'avatar';
-    av.textContent = initials(f.name);
-    const label = document.createElement('div');
-    label.innerHTML = `<div style="font-weight:700">${f.name}</div><div class="muted" style="font-size:12px">${f.online?'online':'offline'}</div>`;
-    li.appendChild(dot);
-    li.appendChild(av);
-    li.appendChild(label);
-    if (activeFriend === f.name) {
-      const tag = document.createElement('div');
-      tag.className = 'badge';
-      tag.textContent = 'active';
-      li.appendChild(tag);
-    }
+    const dot = document.createElement('span'); dot.className = 'dot' + (f.online ? ' online':'');
+    const av  = document.createElement('div'); av.className = 'avatar'; av.textContent = initials(f.name);
+    const col = document.createElement('div');
+    col.innerHTML = `<div style="font-weight:800">${f.name}</div><div class="muted" style="font-size:12px">${f.online?'online':'offline'}</div>`;
+    li.appendChild(dot); li.appendChild(av); li.appendChild(col);
+    if (activeFriend === f.name){ const badge = document.createElement('div'); badge.className='badge'; badge.textContent='active'; li.appendChild(badge); }
     li.onclick = () => openChat(f.name);
-    friendsList.appendChild(li);
+    friendsUL.appendChild(li);
   }
 }
 function renderRequests(){
-  requestsList.innerHTML = '';
-  for(const from of state.requests){
+  if (!requestsUL) return;
+  requestsUL.innerHTML = '';
+  for (const from of state.requests){
     const li = document.createElement('li');
     const av = document.createElement('div'); av.className='avatar'; av.textContent = initials(from);
-    const col = document.createElement('div');
-    col.innerHTML = `<div style="font-weight:700">${from}</div><div class="muted" style="font-size:12px">wants to be friends</div>`;
-    const accept = document.createElement('button'); accept.className='btn xs'; accept.textContent='Accept';
-    const decline = document.createElement('button'); decline.className='btn xs subtle'; decline.textContent='Decline';
-    accept.onclick = e => { e.stopPropagation(); socket.emit('respond friend request', { from, accepted: true }); };
-    decline.onclick = e => { e.stopPropagation(); socket.emit('respond friend request', { from, accepted: false }); };
-    li.appendChild(av); li.appendChild(col); li.appendChild(accept); li.appendChild(decline);
-    requestsList.appendChild(li);
+    const col= document.createElement('div'); col.innerHTML = `<div style="font-weight:800">${from}</div><div class="muted" style="font-size:12px">wants to be friends</div>`;
+    const ok = document.createElement('button'); ok.className='btn xs'; ok.textContent='Accept';
+    const no = document.createElement('button'); no.className='btn xs subtle'; no.textContent='Decline';
+    ok.onclick = e=>{ e.stopPropagation(); socket.emit('respond friend request', { from, accepted:true }); };
+    no.onclick = e=>{ e.stopPropagation(); socket.emit('respond friend request', { from, accepted:false }); };
+    li.appendChild(av); li.appendChild(col); li.appendChild(ok); li.appendChild(no);
+    requestsUL.appendChild(li);
   }
 }
 function renderMessages(){
   messagesEl.innerHTML = '';
   if (!activeFriend){
     const empty = document.createElement('div'); empty.className='empty';
-    empty.innerHTML = `<div class="big">💬</div><div>No conversation selected</div>`;
+    empty.innerHTML = `<div class="big">💬</div><div>Select a friend to start chatting.</div>`;
     messagesEl.appendChild(empty);
-    chatTitle.textContent = 'No conversation';
-    chatStatus.textContent = '';
-    headerActions.innerHTML = '';
+    if (chatTitle) chatTitle.textContent = 'No conversation';
+    if (chatStatus) chatStatus.textContent = '';
+    if (headerActions) headerActions.innerHTML='';
     return;
   }
-  chatTitle.textContent = activeFriend;
+  if (chatTitle) chatTitle.textContent = activeFriend;
   const fObj = state.friends.find(f=>f.name===activeFriend);
-  chatStatus.textContent = fObj?.online ? 'online' : 'offline';
-  headerActions.innerHTML = '';
-  const clearBtn = document.createElement('button'); clearBtn.className='btn xs subtle'; clearBtn.textContent='Clear Local';
-  clearBtn.onclick = () => { state.chats[activeFriend]=[]; saveState(state); renderMessages(); };
-  headerActions.appendChild(clearBtn);
+  if (chatStatus) chatStatus.textContent = fObj?.online ? 'online':'offline';
+
+  if (headerActions){
+    headerActions.innerHTML='';
+    const clearBtn = document.createElement('button'); clearBtn.className='btn xs subtle'; clearBtn.textContent='Clear Local';
+    clearBtn.onclick = ()=>{ state.chats[activeFriend]=[]; saveState(); renderMessages(); };
+    headerActions.appendChild(clearBtn);
+  }
 
   const history = state.chats[activeFriend] || [];
-  for(const m of history){
-    const row = document.createElement('div'); row.className='msg';
-    const av = document.createElement('div'); av.className='avatar'; av.textContent = initials(m.from);
+  for (const m of history){
+    const row = document.createElement('div'); row.className='msg' + (m.from===state.username ? ' mine':'');
+    const av  = document.createElement('div'); av.className='avatar'; av.textContent = initials(m.from);
     const bubble = document.createElement('div'); bubble.className='bubble';
-    const meta = document.createElement('div'); meta.className='meta'; meta.textContent = `${m.from} • ${m.time || timeNow()}`;
+    const meta = document.createElement('div'); meta.className='meta'; meta.textContent = `${m.from} • ${m.time || nowTime()}`;
     const text = document.createElement('div'); text.textContent = m.text;
     bubble.appendChild(meta); bubble.appendChild(text);
     row.appendChild(av); row.appendChild(bubble);
@@ -154,146 +138,126 @@ function renderMessages(){
 }
 function openChat(friend){
   activeFriend = friend;
+  typingEl.textContent = '';
   renderFriends();
   renderMessages();
-  typingEl.textContent = '';
 }
 
-// ---- Login / Logout
-function attemptLogin(name){
-  return new Promise((resolve) => {
-    socket.emit('set username', name, (res) => resolve(res));
+// ------- Login flow -------
+function attemptLogin(name, code){
+  return new Promise(resolve => {
+    socket.emit('set username', { name, code }, (res)=> resolve(res));
   });
 }
-async function doLoginFlow(name){
+async function doLogin(){
   loginErr.textContent = '';
-  const res = await attemptLogin(name);
-  if (!res?.success){
-    loginErr.textContent = res?.message || 'Login failed';
-    return;
-  }
+  const name = (usernameIn.value||'').trim();
+  const code = (adminCodeIn?.value||'').trim();
+  if (!name){ loginErr.textContent='Enter a username'; return; }
+
+  const res = await attemptLogin(name, code);
+  if (!res?.success){ loginErr.textContent = res?.message || 'Login failed'; return; }
+
   state.username = name;
-  // Merge server-returned friends + requests into local
-  for(const f of (res.friends || [])) upsertFriend(f, true); // server knows these, mark online (they are online if server knows? can be refined by online/offline events)
-  setRequests(res.requests || []);
-  saveState(state);
-  renderMe();
-  renderFriends();
-  renderRequests();
-  loginScreen.classList.add('hidden');
-  app.classList.remove('hidden');
-  if (!activeFriend && state.friends.length) openChat(state.friends[0].name);
-}
-loginBtn.addEventListener('click', () => {
-  const name = (usernameInput.value||'').trim();
-  if (!name){ loginErr.textContent = 'Enter a username'; return; }
-  doLoginFlow(name);
-});
-logoutBtn.addEventListener('click', () => {
-  // Keep username in localStorage (so we auto-rejoin), but you can clear if desired:
-  // state.username = null;
-  saveState(state);
-  location.reload();
-});
+  state.isAdmin  = !!res.isAdmin;
+  // seed friends/requests (merge)
+  for(const f of (res.friends||[])) upsertFriend(f, true);
+  setRequests(res.requests||[]);
+  saveState();
 
-// Auto rejoin if we have a username saved
-window.addEventListener('load', () => {
-  renderMe();
-  renderFriends();
-  renderRequests();
-  renderMessages();
+  renderMe(); renderFriends(); renderRequests();
+  loginScreen.classList.add('hidden');
+  if (chatScreen) chatScreen.classList.remove('hidden');
+
+  if (state.friends.length && !activeFriend) openChat(state.friends[0].name);
+
+  if (state.isAdmin && adminPanel){
+    adminPanel.style.display='block';
+  }
+}
+
+// ------- Bind (once) -------
+function bindOnce(){
+  if (bound) return; bound = true;
+
+  // Login
+  loginBtn?.addEventListener('click', doLogin);
+  usernameIn?.addEventListener('keydown', e=>{ if (e.key==='Enter') doLogin(); });
+  adminCodeIn?.addEventListener('keydown', e=>{ if (e.key==='Enter') doLogin(); });
+
+  // Add friend
+  sendFriendBtn?.addEventListener('click', ()=>{
+    const target = (addFriendIn.value||'').trim();
+    if (!target) return;
+    if (target === state.username) return;
+    socket.emit('send friend request', target);
+    addFriendIn.value='';
+  });
+
+  // Send message (NO LOCAL APPEND HERE — prevents duplicate)
+  form?.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    if (!activeFriend) return;
+    const text = (input.value||'').trim();
+    if (!text) return;
+    socket.emit('private message', { to: activeFriend, text });
+    input.value='';
+    socket.emit('pm typing', { to: activeFriend, typing:false });
+  });
+
+  // Typing events
+  let typingTimer = null;
+  input?.addEventListener('input', ()=>{
+    if (!activeFriend) return;
+    socket.emit('pm typing', { to: activeFriend, typing: input.value.length>0 });
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(()=> socket.emit('pm typing', { to: activeFriend, typing:false }), 1200);
+  });
+
+  // Admin refresh (optional snapshot—if server emits admin_message_log periodically, this is not strictly needed)
+  refreshAdmin?.addEventListener('click', ()=> {
+    // noop unless you add a server event like: socket.emit('admin snapshot request')
+  });
+}
+bindOnce();
+
+// ------- Auto-rejoin if username saved -------
+window.addEventListener('load', ()=>{
+  renderMe(); renderFriends(); renderRequests(); renderMessages();
   if (state.username){
-    usernameInput.value = state.username;
-    doLoginFlow(state.username);
+    usernameIn.value = state.username;
+    doLogin(); // auto-login with stored username (+ optional stored code is not persisted for safety)
   }
 });
 
-// ---- Modal (New DM)
-function openModal(){ modal.classList.remove('hidden'); addUsername.value=''; modalMsg.textContent=''; addUsername.focus(); }
-function closeModal(){ modal.classList.add('hidden'); }
-newDmBtn.addEventListener('click', openModal);
-modalClose.addEventListener('click', closeModal);
-modal.addEventListener('click', (e)=>{ if (e.target===modal) closeModal(); });
-sendReqBtn.addEventListener('click', ()=>{
-  const target = (addUsername.value||'').trim();
-  if (!target){ toast('Enter a username','error'); return; }
-  if (target===state.username){ toast("You can't add yourself",'error'); return; }
-  socket.emit('send friend request', target);
-  toast('Request sent','ok');
-});
-
-// ---- Composer
-composer.addEventListener('submit', (e)=>{
-  e.preventDefault();
-  const text = (input.value||'').trim();
-  if (!text || !activeFriend) return;
-  const msg = { from: state.username, text, time: timeNow() };
-  addChatMsg(activeFriend, msg);
-  renderMessages();
-  socket.emit('private message', { to: activeFriend, text });
-  input.value = '';
-  // stop typing
-  socket.emit('pm typing', { to: activeFriend, typing: false });
-});
-
-// Typing indicator (per DM)
-let typingLocalTimer = null;
-input.addEventListener('input', ()=>{
-  if (!activeFriend) return;
-  socket.emit('pm typing', { to: activeFriend, typing: input.value.length>0 });
-  clearTimeout(typingLocalTimer);
-  typingLocalTimer = setTimeout(()=>{
-    socket.emit('pm typing', { to: activeFriend, typing: false });
-  }, 1200);
-});
-
-// ---- Socket events from server
+// ===== Socket events =====
 socket.on('friend request', (from)=>{
   if (!state.requests.includes(from)) state.requests.push(from);
-  saveState(state);
-  renderRequests();
+  saveState(); renderRequests();
 });
-
 socket.on('friend requests', (list)=>{
-  setRequests(list||[]);
-  renderRequests();
+  setRequests(list||[]); renderRequests();
+});
+socket.on('friend accepted', (who)=>{
+  upsertFriend(who, true); renderFriends();
+  if (!activeFriend) openChat(who);
+});
+socket.on('friend declined', (who)=>{
+  // You can add a toast if desired.
 });
 
-socket.on('friend accepted', (friendName)=>{
-  upsertFriend(friendName, true);
-  saveState(state);
-  renderFriends();
-  // Auto-open DM on accept
-  if (!activeFriend) openChat(friendName);
-});
+socket.on('friend online', (name)=>{ upsertFriend(name, true); renderFriends(); });
+socket.on('friend offline', (name)=>{ upsertFriend(name, false); renderFriends(); });
 
-socket.on('friend declined', (from)=>{
-  toast(`${from} declined your request`,'error');
-});
-
-socket.on('friend online', (name)=>{
-  upsertFriend(name, true);
-  renderFriends();
-});
-socket.on('friend offline', (name)=>{
-  upsertFriend(name, false);
-  renderFriends();
-});
-
-// Private messages
 socket.on('private message', (pm)=>{
   const friend = (pm.from === state.username) ? activeFriend : pm.from;
   if (!friend) return;
-  addChatMsg(friend, { from: pm.from, text: pm.text, time: pm.time || timeNow() });
-  if (!activeFriend || activeFriend !== friend){
-    // badge could be implemented; for now we just re-render list
-  }
+  appendDM(friend, { from: pm.from, text: pm.text, time: pm.time || nowTime() });
   if (activeFriend === friend) renderMessages();
 });
 
-// Per-DM typing (requires server to emit 'pm typing' to the other peer)
 socket.on('pm typing', ({ from, typing })=>{
-  if (!activeFriend || activeFriend !== from) return;
+  if (activeFriend !== from) return;
   typingEl.textContent = typing ? `${from} is typing…` : '';
   if (typing){
     clearTimeout(typingTimers[from]);
@@ -301,7 +265,71 @@ socket.on('pm typing', ({ from, typing })=>{
   }
 });
 
-// ---- Small UX niceties
-document.addEventListener('keydown', (e)=>{
-  if (e.key==='Escape' && !modal.classList.contains('hidden')) closeModal();
+// ===== Admin features =====
+socket.on('admin granted', ({ onlineUsers, messages })=>{
+  if (!adminPanel) return;
+  state.isAdmin = true; saveState();
+  adminPanel.style.display='block';
+  renderAdminUsers(onlineUsers||[]);
+  renderAdminMessages(messages||{});
 });
+socket.on('admin message log', (messages)=>{
+  if (!adminPanel) return;
+  renderAdminMessages(messages||{});
+});
+
+function renderAdminUsers(list){
+  if (!adminUsers) return;
+  adminUsers.innerHTML = '';
+  const card = document.createElement('div'); card.className='card';
+  const title = document.createElement('div'); title.className='muted'; title.textContent='Online users';
+  const table = document.createElement('table'); table.className='table'; table.style.width='100%';
+
+  (list||[]).forEach(u=>{
+    const tr=document.createElement('tr');
+    const td1=document.createElement('td'); td1.textContent=u;
+    const td2=document.createElement('td'); td2.className='act';
+    const btn=document.createElement('button'); btn.className='btn xs'; btn.textContent='Ban';
+    btn.onclick = ()=> socket.emit('admin ban', u);
+    td2.appendChild(btn); tr.appendChild(td1); tr.appendChild(td2);
+    table.appendChild(tr);
+  });
+
+  card.appendChild(title); card.appendChild(table);
+  adminUsers.innerHTML='';
+  adminUsers.appendChild(card);
+}
+
+function renderAdminMessages(messages){
+  // Build a list in the admin panel showing pair keys and last few messages
+  const panel = document.getElementById('admin-panel');
+  if (!panel) return;
+
+  // Remove old log if exists
+  let old = document.getElementById('admin-log');
+  if (old) old.remove();
+
+  const log = document.createElement('div'); log.id='admin-log'; log.className='card';
+  const title = document.createElement('div'); title.className='muted'; title.textContent='DM logs (in-memory)';
+  log.appendChild(title);
+
+  const keys = Object.keys(messages||{}).sort();
+  if (!keys.length){
+    const p = document.createElement('div'); p.className='muted'; p.textContent='No messages yet.';
+    log.appendChild(p);
+  } else {
+    keys.forEach(k=>{
+      const wrap = document.createElement('div'); wrap.style.border='1px solid var(--border)'; wrap.style.borderRadius='10px'; wrap.style.padding='8px'; wrap.style.margin='6px 0';
+      const h = document.createElement('div'); h.style.fontWeight='800'; h.style.marginBottom='4px'; h.textContent=k;
+      wrap.appendChild(h);
+      const last = (messages[k]||[]).slice(-5);
+      last.forEach(m=>{
+        const line = document.createElement('div'); line.className='muted'; line.textContent = `[${m.time}] ${m.from}: ${m.text}`;
+        wrap.appendChild(line);
+      });
+      log.appendChild(wrap);
+    });
+  }
+
+  panel.appendChild(log);
+}
