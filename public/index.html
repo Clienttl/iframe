@@ -1,36 +1,98 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Simple Chat with Friends</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <title>DM Chat — Friends Only</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <div id="login-screen">
-        <h2>Enter Username</h2>
-        <input id="username-input" placeholder="Username">
-        <button id="login-btn">Join Chat</button>
-        <p id="login-error"></p>
+  <!-- LOGIN -->
+  <div id="login-screen" class="center">
+    <div class="panel">
+      <h1>DM Chat</h1>
+      <p class="muted">Pick a username (only online uniqueness).</p>
+      <div class="row">
+        <input id="username-input" class="input" placeholder="Username" />
+      </div>
+      <button id="login-btn" class="btn primary">Join Chat</button>
+      <div id="login-error" class="error"></div>
     </div>
+  </div>
 
-    <div id="chat-screen" style="display:none;">
-        <div id="sidebar">
-            <h3>Online Users</h3>
-            <ul id="users"></ul>
-            <h3>Friends</h3>
-            <ul id="friends"></ul>
+  <!-- APP -->
+  <div id="app" class="app hidden">
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar">
+      <div class="me">
+        <div class="avatar" id="me-avatar"></div>
+        <div>
+          <div class="me-name" id="me-name">me</div>
+          <div class="me-status">online</div>
         </div>
-        <div id="chat-area">
-            <div id="messages"></div>
-            <div id="typing-indicator"></div>
-            <form id="message-form">
-                <input id="message-input" autocomplete="off" placeholder="Type a message...">
-                <button>Send</button>
-            </form>
+        <button id="logout-btn" class="btn xs subtle" title="Logout">Logout</button>
+      </div>
+
+      <div class="section">
+        <div class="section-head">
+          <div>Friends</div>
+          <button id="new-dm-btn" class="btn xs">New DM</button>
         </div>
+        <ul id="friends-list" class="list"></ul>
+      </div>
+
+      <div class="section">
+        <div class="section-head">
+          <div>Requests</div>
+        </div>
+        <ul id="requests-list" class="list"></ul>
+      </div>
+    </aside>
+
+    <!-- MAIN CHAT -->
+    <main class="main">
+      <header class="chat-header">
+        <div class="chat-title">
+          <span class="title" id="chat-title">No conversation</span>
+          <span id="chat-status" class="status muted"></span>
+        </div>
+        <div id="header-actions" class="header-actions"></div>
+      </header>
+
+      <section id="messages" class="messages">
+        <div class="empty">
+          <div class="big">👋</div>
+          <div>Select a friend to start chatting.</div>
+        </div>
+      </section>
+
+      <div class="typing muted" id="typing-indicator"></div>
+
+      <form id="composer" class="composer">
+        <input id="message-input" class="input" placeholder="Message..." autocomplete="off" />
+        <button class="btn primary" id="send-btn" type="submit">Send</button>
+      </form>
+    </main>
+  </div>
+
+  <!-- NEW DM MODAL -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>Start a DM</h3>
+        <button id="modal-close" class="btn xs subtle">✕</button>
+      </div>
+      <div class="row">
+        <input id="add-username" class="input" placeholder="Exact username (must be online)" />
+      </div>
+      <div class="row">
+        <button id="send-request" class="btn primary">Send friend request</button>
+      </div>
+      <div id="modal-msg" class="muted"></div>
     </div>
+  </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="client.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
 </body>
 </html>
