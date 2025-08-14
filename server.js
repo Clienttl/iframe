@@ -9,44 +9,36 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const onlineUsers = new Map();
-const messages = [];
-const typingUsers = new Set();
-const friendRequests = {};
-const friends = {};
+const onlineUsers = new Map(); // username -> socketId
+const friendRequests = {}; // username -> [pending usernames]
+const friends = {}; // username -> [friend usernames]
 
 io.on('connection', (socket) => {
     let username = null;
 
     socket.on('set username', (name, callback) => {
         name = name.trim();
-        if (!name) return callback({ success: false, message: 'Username cannot be empty' });
-        if (onlineUsers.has(name)) return callback({ success: false, message: 'Username is taken' });
+        if (!name) return callback({ success: false, message: 'Username required' });
+        if (onlineUsers.has(name)) return callback({ success: false, message: 'Username taken' });
+
         username = name;
         onlineUsers.set(username, socket.id);
         friendRequests[username] = friendRequests[username] || [];
         friends[username] = friends[username] || [];
-        io.emit('user list', Array.from(onlineUsers.keys()));
-        callback({ success: true, messages });
-    });
 
-    socket.on('chat message', (msg) => {
-        if (!username) return;
-        const messageObj = { username, text: msg, time: new Date().toLocaleTimeString() };
-        messages.push(messageObj);
-        if (messages.length > 200) messages.shift();
-        io.emit('chat message', messageObj);
-    });
+        // Notify friends that user is online
+        friends[username].forEach(f => {
+            if (onlineUsers.has(f)) {
+                io.to(onlineUsers.get(f)).emit('friend online', username);
+            }
+        });
 
-    socket.on('typing', (isTyping) => {
-        if (!username) return;
-        if (isTyping) typingUsers.add(username);
-        else typingUsers.delete(username);
-        io.emit('typing users', Array.from(typingUsers));
+        callback({ success: true, friends: friends[username], requests: friendRequests[username] });
     });
 
     socket.on('send friend request', (target) => {
-        if (!username || !onlineUsers.has(target) || target === username) return;
+        if (!username || !target || target === username) return;
+        if (!onlineUsers.has(target)) return; // must be online to send
         friendRequests[target] = friendRequests[target] || [];
         if (!friendRequests[target].includes(username) && !friends[target]?.includes(username)) {
             friendRequests[target].push(username);
@@ -54,27 +46,41 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('accept friend request', (from) => {
-        if (!username) return;
+    socket.on('respond friend request', ({ from, accepted }) => {
+        if (!username || !from) return;
         friendRequests[username] = (friendRequests[username] || []).filter(u => u !== from);
-        friends[username].push(from);
-        friends[from].push(username);
-        io.to(onlineUsers.get(from)).emit('friend accepted', username);
+
+        if (accepted) {
+            friends[username].push(from);
+            friends[from].push(username);
+
+            if (onlineUsers.has(from)) {
+                io.to(onlineUsers.get(from)).emit('friend accepted', username);
+                io.to(socket.id).emit('friend accepted', from);
+            }
+        } else {
+            if (onlineUsers.has(from)) {
+                io.to(onlineUsers.get(from)).emit('friend declined', username);
+            }
+        }
+        io.to(socket.id).emit('friend requests', friendRequests[username]);
     });
 
     socket.on('private message', ({ to, text }) => {
         if (!username || !friends[username]?.includes(to)) return;
-        const pm = { from: username, text, time: new Date().toLocaleTimeString() };
-        io.to(onlineUsers.get(to)).emit('private message', pm);
-        io.to(socket.id).emit('private message', pm);
+        const msg = { from: username, text, time: new Date().toLocaleTimeString() };
+        if (onlineUsers.has(to)) io.to(onlineUsers.get(to)).emit('private message', msg);
+        io.to(socket.id).emit('private message', msg);
     });
 
     socket.on('disconnect', () => {
         if (username) {
             onlineUsers.delete(username);
-            typingUsers.delete(username);
-            io.emit('user list', Array.from(onlineUsers.keys()));
-            io.emit('typing users', Array.from(typingUsers));
+            friends[username].forEach(f => {
+                if (onlineUsers.has(f)) {
+                    io.to(onlineUsers.get(f)).emit('friend offline', username);
+                }
+            });
         }
     });
 });
