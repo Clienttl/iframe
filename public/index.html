@@ -1,49 +1,36 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>about:blank</title>
-    <style>
-        body {
-            background-color: black;
-            color: #00FF00;
-            font-family: "Courier New", monospace;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .container {
-            border: 3px solid #00FF00;
-            padding: 20px;
-            background-color: black;
-            text-align: center;
-        }
-        h1 {
-            text-shadow: 2px 2px 5px #00FF00;
-        }
-        .button {
-            display: block;
-            width: 200px;
-            margin: 10px auto;
-            padding: 10px;
-            background-color: #444;
-            color: #FFF;
-            border: 2px solid #00FF00;
-            text-decoration: none;
-            font-size: 20px;
-            font-weight: bold;
-        }
-        .button:hover {
-            background-color: #222;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <title>Simple Chat with Friends</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Dodgeball</h1>
-        <a href="s" class="button">Singleplayer</a>
-        <a href="m" class="button">Multiplayer</a>
+    <div id="login-screen">
+        <h2>Enter Username</h2>
+        <input id="username-input" placeholder="Username">
+        <button id="login-btn">Join Chat</button>
+        <p id="login-error"></p>
     </div>
+
+    <div id="chat-screen" style="display:none;">
+        <div id="sidebar">
+            <h3>Online Users</h3>
+            <ul id="users"></ul>
+            <h3>Friends</h3>
+            <ul id="friends"></ul>
+        </div>
+        <div id="chat-area">
+            <div id="messages"></div>
+            <div id="typing-indicator"></div>
+            <form id="message-form">
+                <input id="message-input" autocomplete="off" placeholder="Type a message...">
+                <button>Send</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
 </body>
 </html>
